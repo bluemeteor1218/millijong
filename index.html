@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ミリオン麻雀</title>
+    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ対応・演出強化）</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
     <style>
         body { font-family: sans-serif; background: #222; color: #333; margin: 0; padding: 0; overflow: hidden; }
-        .panel { background: rgba(255, 255, 255, 0.95); padding: 15px; margin: 10px; border-radius: 8px; position: absolute; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        .panel { background: rgba(255, 255, 255, 0.95); padding: 15px; margin: 10px; border-radius: 8px; position: absolute; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 400px; max-height: 90vh; overflow-y: auto;}
         .btn { padding: 8px 16px; background: #ff7bac; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn:hover { background: #e66699; }
         
@@ -53,28 +53,45 @@
         #hand-2 { top: clamp(10px, 2vh, 20px); left: 50%; transform: translateX(-50%) rotate(180deg); }
         #hand-3 { top: 50%; left: clamp(15px, 3vmin, 25px); transform: translate(-50%, -50%) rotate(90deg); }
         
-        /* 変更点：捨て牌が中央枠と被らないよう配置距離を拡大 */
         .river-area { position: absolute; width: clamp(140px, 24vmin, 220px); height: clamp(70px, 12vmin, 110px); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 1px;}
-        #river-0 { top: calc(50% + clamp(130px, 20vmin, 170px)); left: 50%; transform: translateX(-50%); } 
-        #river-2 { bottom: calc(50% + clamp(130px, 20vmin, 170px)); left: 50%; transform: translateX(-50%) rotate(180deg); } 
-        #river-1 { top: 50%; left: calc(50% + clamp(180px, 28vmin, 240px)); transform: translate(-50%, -50%) rotate(-90deg); } 
-        #river-3 { top: 50%; left: calc(50% - clamp(180px, 28vmin, 240px)); transform: translate(-50%, -50%) rotate(90deg); } 
+        /* 捨て牌とセンターコンソールの距離をさらに離す */
+        #river-0 { top: calc(50% + clamp(140px, 22vmin, 180px)); left: 50%; transform: translateX(-50%); } 
+        #river-2 { bottom: calc(50% + clamp(140px, 22vmin, 180px)); left: 50%; transform: translateX(-50%) rotate(180deg); } 
+        #river-1 { top: 50%; left: calc(50% + clamp(190px, 30vmin, 250px)); transform: translate(-50%, -50%) rotate(-90deg); } 
+        #river-3 { top: 50%; left: calc(50% - clamp(190px, 30vmin, 250px)); transform: translate(-50%, -50%) rotate(90deg); } 
         
-        /* 変更点：中央ステータス画面全体のサイズ調整 */
-        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: clamp(10px, 2vmin, 20px); border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 5; min-width: clamp(180px, 30vmin, 260px);}
+        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: clamp(10px, 2vmin, 20px); border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 5; min-width: clamp(180px, 30vmin, 260px); transition: all 0.3s ease;}
         
-        .center-scores { display: grid; grid-template-columns: 90px 110px 90px; grid-template-rows: auto auto auto; gap: 6px; margin: 12px 0; align-items: center; justify-items: center;}
-        .score-box { background: rgba(0,0,0,0.5); padding: 6px; border-radius: 4px; font-weight: bold; line-height: 1.3; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 85px; margin: 0 auto; width: 100%; box-sizing: border-box;}
+        .center-scores { display: grid; grid-template-columns: 100px 120px 100px; grid-template-rows: auto auto auto; gap: 6px; margin: 12px 0; align-items: center; justify-items: center;}
+        .score-box { background: rgba(0,0,0,0.5); padding: 6px; border-radius: 4px; font-weight: bold; line-height: 1.3; text-align: center; white-space: normal; word-break: break-all; margin: 0 auto; width: 100%; box-sizing: border-box; border: 2px solid transparent; transition: all 0.2s;}
+        
+        .score-box.active-turn { border-color: #ff0055 !important; background: rgba(255, 0, 85, 0.2) !important; box-shadow: 0 0 10px rgba(255, 0, 85, 0.8); }
+
         .score-top { grid-column: 2; grid-row: 1; }
         .score-left { grid-column: 1; grid-row: 2; }
         .center-info-cell { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .score-right { grid-column: 3; grid-row: 2; }
-        .score-bottom { grid-column: 2; grid-row: 3; border: 1px solid #ff7bac; }
+        .score-bottom { grid-column: 2; grid-row: 3; }
 
         .action-bar { position: absolute; bottom: 100px; right: 20%; background: rgba(255, 235, 59, 0.95); padding: 15px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 50; border: 2px solid #fbc02d; }
         
         #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300; pointer-events: none; display: flex; flex-direction: column; gap: 5px; align-items: center; }
         
+        #my-turn-toast {
+            position: absolute; top: calc(50% + clamp(110px, 18vmin, 150px)); left: 50%; transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #ff7bac, #e91e63); color: white; padding: 6px 20px; border-radius: 20px;
+            font-size: 16px; font-weight: bold; pointer-events: none; z-index: 400; opacity: 0; display: none;
+            box-shadow: 0 4px 10px rgba(233, 30, 99, 0.5); border: 2px solid #fff;
+        }
+        .show-my-turn { display: block !important; animation: floatUpFade 1.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes floatUpFade {
+            0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
+            15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
+            30% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+            70% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -30px) scale(0.9); }
+        }
+
         #cutin-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 2000; }
         #cutin-text { font-size: 120px; font-weight: bold; color: #fff; text-shadow: 0 0 30px #ff0055, 4px 4px 0 #000; transform: scale(0); font-style: italic; letter-spacing: 10px;}
         @keyframes popIn { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 70% { transform: scale(1.1) rotate(0deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
@@ -91,8 +108,7 @@
             #result-winner { font-size: 24px !important; }
             .result-score { font-size: 30px !important; }
             .result-details { font-size: 16px; }
-            .center-scores { grid-template-columns: 75px 95px 75px; gap: 4px; }
-            .score-box { max-width: 75px; }
+            .center-scores { grid-template-columns: 85px 105px 85px; gap: 4px; }
         }
     </style>
 </head>
@@ -102,6 +118,21 @@
         <label style="font-weight:bold; display:block; margin-bottom: 10px;">
             プレイヤー名: <input type="text" id="player-name-input" value="プロデューサー" style="padding: 5px; width: 150px; font-size:14px;">
         </label>
+        
+        <div style="font-size: 12px; color: #444; background: #f0f0f0; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #ddd; line-height: 1.5;">
+            <strong>【特殊牌について】</strong><br>
+            ・<strong>Pr/Fa/Anｵｰﾙﾏｲﾃｨ</strong>: それぞれの属性アイドルの代わりになります。<br>
+            ・<strong>P（ｼﾞｮｰｶｰ）</strong>: 誰の代わりにもなります。<br>
+            ・<strong>青葉美咲 / 音無小鳥</strong>: 捨てると山札から2枚ドローできます。<br>
+            <br>
+            <strong>【役と点数（1000点ベース）】</strong><br>
+            ・<strong>ユニット役</strong>: ユニットの人数-2 が翻数になります。<br>
+            ・<strong>門前（鳴きなし）</strong>: +1翻<br>
+            ・<strong>リーチ</strong>: +1翻（門前テンパイ時のみ。供託1000点消費）<br>
+            ・<strong>純愛（ジョーカー不使用）</strong>: +2翻<br>
+            （4翻=満貫 8000点 / 8翻=倍満 16000点 / 13翻=役満 32000点）
+        </div>
+
         <hr>
         <h3>部屋を作る（ホスト）</h3>
         <select id="game-rule" style="padding: 5px; font-size: 14px; margin-bottom: 10px;">
@@ -111,7 +142,7 @@
         </select><br>
         <button class="btn" onclick="createRoom()">ホストになる</button>
         <p>部屋番号: <strong id="my-id" style="font-size: 1.2em; color: #e66699;">未作成</strong></p>
-        <p>参加者: <span id="player-count">0</span> / 4人</p>
+        <p>参加者: <span id="player-count">0</span> / 4 人</p>
         <button class="btn" onclick="initMatch()" id="start-btn" style="display:none; background:#4caf50;">試合開始 (不足分はCPU)</button>
         <hr>
         <h3>部屋に入る（クライアント）</h3>
@@ -130,6 +161,8 @@
         <!-- 右側のゲームボード -->
         <div id="game-board">
             <div id="toast-container"></div>
+            
+            <div id="my-turn-toast">あなたの番です</div>
 
             <div id="center-status">
                 <div class="center-scores">
@@ -137,7 +170,6 @@
                     <div id="score-box-3" class="score-box score-left"></div>
                     
                     <div class="center-info-cell">
-                        <!-- 変更点：中央テキストサイズの拡大 -->
                         <div id="round-info" style="font-size: 22px; font-weight: bold; color: #ff7bac; margin-bottom: 4px;">東1局</div>
                         <div style="font-size: 14px; color: #ccc;">残り <span id="deck-count" style="font-size: 20px; font-weight: bold; color:#fff;">-</span></div>
                         <div style="font-size: 14px; color: #ccc; margin-top: 4px;">供託: <span id="riichi-sticks-count" style="color: #ff5722; font-weight:bold; font-size: 18px;">0</span></div>
@@ -160,7 +192,7 @@
             <div class="other-hand" id="hand-3"></div>
             
             <div class="action-bar" id="action-bar">
-                <span style="font-weight:bold; margin-right:10px;"><span id="action-msg-text">アクション</span> <span id="action-timer" style="color:red; font-size:18px;">10</span>秒:</span>
+                <span style="font-weight:bold; margin-right:10px;"><span id="action-msg-text">アクション</span> <span id="action-timer" style="color:red; font-size:18px;">5</span>秒:</span>
                 <button class="btn" id="btn-riichi" style="display:none; background: #ff9800; margin-right: 5px;" onclick="toggleRiichi()">リーチ</button>
                 <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
                 <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
@@ -405,6 +437,7 @@ let globalRiichiSticks = 0;
 let globalRiichiDiscardIndex = [-1, -1, -1, -1];
 let isPendingRiichi = false;
 let validRiichiDiscards = [];
+let clientCurrentTurn = -1;
 
 let clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
 
@@ -624,10 +657,13 @@ function advanceTurnAfterDiscard() {
             else if (clerkState.firstNakiPlayer !== null) nextP = (clerkState.firstNakiPlayer + 1) % 4;
             else nextP = (clerkState.originalPlayer + 1) % 4;
             
-            clerkState.active = false; currentTurn = nextP; nextTurn(); return;
+            clerkState.active = false; currentTurn = nextP; 
+            setTimeout(nextTurn, 1000); 
+            return;
         }
     }
-    currentTurn = (currentDiscard.pIdx + 1) % 4; nextTurn();
+    currentTurn = (currentDiscard.pIdx + 1) % 4; 
+    setTimeout(nextTurn, 1000); 
 }
 
 function resolveActions() {
@@ -733,6 +769,15 @@ function toggleRiichi() {
     let btn = document.getElementById('btn-riichi');
     btn.style.background = isPendingRiichi ? '#ff5722' : '#ff9800';
     renderHand(isMyTurnNow);
+}
+
+function showMyTurnToast() {
+    const toast = document.getElementById('my-turn-toast');
+    toast.style.display = 'block';
+    toast.classList.remove('show-my-turn');
+    void toast.offsetWidth; 
+    toast.classList.add('show-my-turn');
+    setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
 function toggleLockUnit(unitName) {
@@ -1124,13 +1169,20 @@ function updateScores(scores) {
             let isDealer = (i === currentDealer);
             let dealerMark = isDealer ? '<span style="color:#ff7bac; font-weight:bold;">[親]</span> ' : '';
             let riichiMark = globalPlayerRiichi[i] ? '<span style="color:#ff5722; font-weight:bold;">[立直]</span> ' : '';
-            box.innerHTML = `<span style="font-size:12px; color:#ccc; display:block; overflow:hidden; text-overflow:ellipsis;">${dealerMark}${riichiMark}${nName}</span><span style="color:#ffeb3b; font-size:18px;">${scores[i]}</span>`;
+            
+            box.innerHTML = `<span style="font-size:12px; color:#ccc; display:block; word-break: break-all;">${dealerMark}${riichiMark}${nName}</span><span style="color:#ffeb3b; font-size:18px;">${scores[i]}</span>`;
+            
+            if (i === clientCurrentTurn) {
+                box.classList.add('active-turn');
+            } else {
+                box.classList.remove('active-turn');
+            }
         }
     } 
 }
 
 function startActionTimer() {
-    let timeLeft = 10;
+    let timeLeft = 5; 
     document.getElementById('action-msg-text').innerText = 'アクション';
     document.getElementById('action-timer').innerText = timeLeft;
     clearInterval(actionTimerInterval);
@@ -1143,7 +1195,7 @@ function startActionTimer() {
 }
 
 function startDiscardTimer() {
-    let timeLeft = 10;
+    let timeLeft = 5; 
     document.getElementById('action-bar').style.display = 'block';
     document.getElementById('action-msg-text').innerText = '捨てる牌を選択';
     document.getElementById('btn-tsumo').style.display = 'none';
@@ -1195,23 +1247,31 @@ function handleHostMsg(data) {
         globalPlayerNames = data.names; document.getElementById('result-overlay').style.display = 'none';
         myId = data.pId; myLocalHand = data.hand; roleMap = data.roles; lockedUnits.clear(); currentLockedIndices.clear();
         currentDealer = data.dealer;
+        clientCurrentTurn = data.dealer; 
+        
         document.getElementById('setup-panel').style.display = 'none'; 
         document.getElementById('app-container').style.display = 'flex'; 
         document.getElementById('deck-count').innerText = data.deckLen; document.getElementById('round-info').innerText = `${ROUND_NAMES[data.bakaze]}${data.kyoku}局`;
         isMyTurnNow = false; isPendingRiichi = false; document.getElementById('action-status').style.visibility = 'hidden';
         document.getElementById('river-0').innerHTML=''; document.getElementById('river-1').innerHTML=''; document.getElementById('river-2').innerHTML=''; document.getElementById('river-3').innerHTML='';
         reorderLockedTilesToLeft(); renderHand(false); renderOtherHands();
+        updateScores(playerScores); 
     }
     
     if(data.type === 'TURN_CHANGE') { 
         document.getElementById('action-status').style.visibility = 'hidden'; 
         document.getElementById('deck-count').innerText = data.deckLen; 
+        clientCurrentTurn = data.turn; 
+        
         if(data.turn !== myId) { isMyTurnNow = false; renderHand(false); } 
         renderOtherHands(); 
+        updateScores(playerScores); 
     }
     
     if(data.type === 'DRAWN_TILE') {
         myLocalHand.push(data.tile); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
+        showMyTurnToast(); 
+        
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         let globalMemo = {};
         
@@ -1274,8 +1334,12 @@ function handleHostMsg(data) {
         statusEl.innerText = '他家アクション待機中...'; statusEl.style.color = '#ffeb3b'; statusEl.style.visibility = 'visible'; 
     }
     if(data.type === 'CLERK_EFFECT') { document.getElementById('deck-count').innerText = data.deckLen; renderOtherHands(); }
-    if(data.type === 'CLERK_DRAW') { myLocalHand.push(...data.drawn); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); }
-    if(data.type === 'TURN_CONTINUE') { if(data.pIdx === myId) { isMyTurnNow = true; renderHand(true); } renderOtherHands(); }
+    if(data.type === 'CLERK_DRAW') { myLocalHand.push(...data.drawn); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showMyTurnToast(); }
+    if(data.type === 'TURN_CONTINUE') { 
+        clientCurrentTurn = data.pIdx; updateScores(playerScores);
+        if(data.pIdx === myId) { isMyTurnNow = true; renderHand(true); showMyTurnToast(); } 
+        renderOtherHands(); 
+    }
     
     if(data.type === 'ASK_ACTION') {
         if(data.discarder !== myId && roleMap[myId] !== 'CPU') {
@@ -1325,7 +1389,7 @@ function handleHostMsg(data) {
         document.getElementById('action-status').style.visibility = 'hidden';
         myLocalHand = data.hand; 
         if(data.unitName) lockedUnits.add(data.unitName); 
-        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true);
+        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showMyTurnToast();
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
         let globalMemo = {};
