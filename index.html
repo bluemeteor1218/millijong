@@ -2,8 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>ミリオン麻雀（進捗表示51%以上・厳密化版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ミリオン麻雀</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
     <style>
         body { font-family: sans-serif; background: #222; color: #333; margin: 0; padding: 0; overflow: hidden; }
         .panel { background: rgba(255, 255, 255, 0.95); padding: 15px; margin: 10px; border-radius: 8px; position: absolute; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
@@ -12,8 +14,8 @@
         
         #app-container { display: none; width: 100vw; height: 100vh; flex-direction: row; }
         
-        #progress-sidebar { width: 340px; background: #fdfdfd; border-right: 2px solid #aaa; display: flex; flex-direction: column; padding: 15px; box-sizing: border-box; overflow-y: auto; z-index: 150; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
-        .progress-header { font-size: 18px; font-weight: bold; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
+        #progress-sidebar { width: clamp(200px, 25vw, 340px); background: #fdfdfd; border-right: 2px solid #aaa; display: flex; flex-direction: column; padding: clamp(10px, 1.5vw, 15px); box-sizing: border-box; overflow-y: auto; z-index: 150; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
+        .progress-header { font-size: clamp(14px, 1.5vw, 18px); font-weight: bold; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
         .progress-item { margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; transition: background 0.2s, border-color 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .progress-item:hover { background: #e0f7fa; border-color: #00bcd4; }
         .progress-item.selected { background: #fffde7; border-color: #fbc02d; border-width: 2px; }
@@ -22,12 +24,13 @@
         
         #game-board { flex: 1; position: relative; overflow: hidden; background: #0b5b2d; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); display: block; }
         
-        .mahjong-tile { width: 34px; height: 48px; background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 4px; border: 1px solid #999; box-shadow: 1px 3px 0 #2e8b57, 1px 3px 3px rgba(0,0,0,0.4); display: inline-flex; align-items: center; justify-content: center; margin: 1px; cursor: default; position: relative; box-sizing: border-box; user-select: none; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+        .mahjong-tile { width: clamp(20px, 3.5vmin, 34px); height: clamp(28px, 5vmin, 48px); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 4px; border: 1px solid #999; box-shadow: 1px 3px 0 #2e8b57, 1px 3px 3px rgba(0,0,0,0.4); display: inline-flex; align-items: center; justify-content: center; margin: 1px; cursor: default; position: relative; box-sizing: border-box; user-select: none; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
         .mahjong-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; pointer-events: none; }
         .mahjong-tile.facedown img { display: none; }
+        .mahjong-tile.riichi-discard { transform: rotate(-90deg); margin: 0 4px; }
         
-        .tile-text { writing-mode: vertical-rl; text-orientation: upright; font-size: 11px; font-weight: bold; color: #111; letter-spacing: -1px; pointer-events: none; }
-        .mahjong-tile.almighty .tile-text { color: #d00; font-size: 14px; }
+        .tile-text { writing-mode: vertical-rl; text-orientation: upright; font-size: clamp(9px, 1.2vmin, 11px); font-weight: bold; color: #111; letter-spacing: -1px; pointer-events: none; }
+        .mahjong-tile.almighty .tile-text { color: #d00; font-size: clamp(11px, 1.5vmin, 14px); }
         .mahjong-tile.almighty { background: linear-gradient(to bottom, #fff0f5, #ffd6e6); box-shadow: 1px 3px 0 #c22757, 1px 3px 3px rgba(0,0,0,0.4); }
         .mahjong-tile.clerk .tile-text { color: #004d40; }
         .mahjong-tile.clerk { background: linear-gradient(to bottom, #e8f5e9, #c8e6c9); box-shadow: 1px 3px 0 #388e3c, 1px 3px 3px rgba(0,0,0,0.4); }
@@ -38,28 +41,30 @@
         .mahjong-tile.hover-highlight { box-shadow: 0 0 15px #00ffff, 1px 3px 0 #2e8b57; border-color: #00ffff; transform: translateY(-8px); z-index: 10; }
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
-        #my-hand-area { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 10px; }
-        #my-hand-area .mahjong-tile { width: 46px; height: 64px; cursor: grab; }
+        #my-hand-area { position: absolute; bottom: clamp(5px, 2vh, 15px); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 10px; }
+        #my-hand-area .mahjong-tile { width: clamp(28px, 4.8vmin, 46px); height: clamp(40px, 6.7vmin, 64px); cursor: grab; }
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
-        #my-hand-area .mahjong-tile.disabled { pointer-events: none; opacity: 0.8; }
-        #my-hand-area .tile-text { font-size: 14px; }
-        #my-hand-area .mahjong-tile.almighty .tile-text { font-size: 18px; }
+        #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
+        #my-hand-area .tile-text { font-size: clamp(11px, 1.6vmin, 14px); }
+        #my-hand-area .mahjong-tile.almighty .tile-text { font-size: clamp(14px, 2vmin, 18px); }
         
         .other-hand { position: absolute; display: flex; gap: 1px; pointer-events: none; }
-        #hand-1 { top: 50%; right: 80px; transform: translateY(-50%) rotate(-90deg); transform-origin: center center; }
-        #hand-2 { top: 20px; left: 50%; transform: translateX(-50%) rotate(180deg); }
-        #hand-3 { top: 50%; left: 80px; transform: translateY(-50%) rotate(90deg); transform-origin: center center; }
+        #hand-1 { top: 50%; left: calc(100% - clamp(15px, 3vmin, 25px)); transform: translate(-50%, -50%) rotate(-90deg); }
+        #hand-2 { top: clamp(10px, 2vh, 20px); left: 50%; transform: translateX(-50%) rotate(180deg); }
+        #hand-3 { top: 50%; left: clamp(15px, 3vmin, 25px); transform: translate(-50%, -50%) rotate(90deg); }
         
-        .river-area { position: absolute; width: 220px; height: 110px; display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 1px;}
-        #river-0 { top: calc(50% + 120px); left: 50%; transform: translateX(-50%); } 
-        #river-2 { bottom: calc(50% + 120px); left: 50%; transform: translateX(-50%) rotate(180deg); } 
-        #river-1 { top: 50%; left: calc(50% + 170px); transform: translateY(-50%) rotate(-90deg); } 
-        #river-3 { top: 50%; right: calc(50% + 170px); transform: translateY(-50%) rotate(90deg); } 
+        /* 変更点：捨て牌が中央枠と被らないよう配置距離を拡大 */
+        .river-area { position: absolute; width: clamp(140px, 24vmin, 220px); height: clamp(70px, 12vmin, 110px); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 1px;}
+        #river-0 { top: calc(50% + clamp(130px, 20vmin, 170px)); left: 50%; transform: translateX(-50%); } 
+        #river-2 { bottom: calc(50% + clamp(130px, 20vmin, 170px)); left: 50%; transform: translateX(-50%) rotate(180deg); } 
+        #river-1 { top: 50%; left: calc(50% + clamp(180px, 28vmin, 240px)); transform: translate(-50%, -50%) rotate(-90deg); } 
+        #river-3 { top: 50%; left: calc(50% - clamp(180px, 28vmin, 240px)); transform: translate(-50%, -50%) rotate(90deg); } 
         
-        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 5; min-width: 220px;}
+        /* 変更点：中央ステータス画面全体のサイズ調整 */
+        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: #fff; padding: clamp(10px, 2vmin, 20px); border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 5; min-width: clamp(180px, 30vmin, 260px);}
         
-        .center-scores { display: grid; grid-template-columns: 80px 100px 80px; grid-template-rows: auto auto auto; gap: 4px; margin: 10px 0; align-items: center; justify-items: center;}
-        .score-box { background: rgba(0,0,0,0.5); padding: 4px; border-radius: 4px; font-weight: bold; line-height: 1.2; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 75px; margin: 0 auto; width: 100%; box-sizing: border-box;}
+        .center-scores { display: grid; grid-template-columns: 90px 110px 90px; grid-template-rows: auto auto auto; gap: 6px; margin: 12px 0; align-items: center; justify-items: center;}
+        .score-box { background: rgba(0,0,0,0.5); padding: 6px; border-radius: 4px; font-weight: bold; line-height: 1.3; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 85px; margin: 0 auto; width: 100%; box-sizing: border-box;}
         .score-top { grid-column: 2; grid-row: 1; }
         .score-left { grid-column: 1; grid-row: 2; }
         .center-info-cell { grid-column: 2; grid-row: 2; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -79,6 +84,16 @@
         #result-hand .mahjong-tile { width: 40px; height: 56px; font-size: 14px; box-shadow: none; border-color: #555;}
         .result-details { font-size: 20px; line-height: 1.6; }
         .result-score { font-size: 40px; color: #ffeb3b; font-weight: bold; margin-top: 10px; text-shadow: 2px 2px 4px #000;}
+
+        @media screen and (max-width: 800px) {
+            .btn { padding: 6px 12px; font-size: 12px; }
+            .action-bar { bottom: 80px; right: 10px; padding: 10px; }
+            #result-winner { font-size: 24px !important; }
+            .result-score { font-size: 30px !important; }
+            .result-details { font-size: 16px; }
+            .center-scores { grid-template-columns: 75px 95px 75px; gap: 4px; }
+            .score-box { max-width: 75px; }
+        }
     </style>
 </head>
 <body>
@@ -96,7 +111,7 @@
         </select><br>
         <button class="btn" onclick="createRoom()">ホストになる</button>
         <p>部屋番号: <strong id="my-id" style="font-size: 1.2em; color: #e66699;">未作成</strong></p>
-        <p>参加者: <span id="player-count">0</span> / 4 人</p>
+        <p>参加者: <span id="player-count">0</span> / 4人</p>
         <button class="btn" onclick="initMatch()" id="start-btn" style="display:none; background:#4caf50;">試合開始 (不足分はCPU)</button>
         <hr>
         <h3>部屋に入る（クライアント）</h3>
@@ -107,7 +122,7 @@
     <div id="app-container">
         <!-- 左側のサイドバー（進捗表） -->
         <div id="progress-sidebar">
-            <div class="progress-header">ユニット進捗 <span style="font-size:12px; font-weight:normal; color:#666;">(クリックで手牌ロック)</span></div>
+            <div class="progress-header">ユニット進捗 <span style="font-size:12px; font-weight:normal; color:#666;">(クリックでロック)</span></div>
             <button id="btn-toggle-alm" class="btn" style="width:100%; margin-bottom:15px; background:#4caf50;" onclick="toggleAlmighty()">ALM牌で予測: ON</button>
             <div id="progress-list"></div>
         </div>
@@ -122,19 +137,20 @@
                     <div id="score-box-3" class="score-box score-left"></div>
                     
                     <div class="center-info-cell">
-                        <div id="round-info" style="font-size: 18px; font-weight: bold; color: #ff7bac; margin-bottom: 2px;">東1局</div>
-                        <div style="font-size: 11px; color: #ccc;">残り <span id="deck-count" style="font-size: 16px; font-weight: bold; color:#fff;">-</span></div>
+                        <!-- 変更点：中央テキストサイズの拡大 -->
+                        <div id="round-info" style="font-size: 22px; font-weight: bold; color: #ff7bac; margin-bottom: 4px;">東1局</div>
+                        <div style="font-size: 14px; color: #ccc;">残り <span id="deck-count" style="font-size: 20px; font-weight: bold; color:#fff;">-</span></div>
+                        <div style="font-size: 14px; color: #ccc; margin-top: 4px;">供託: <span id="riichi-sticks-count" style="color: #ff5722; font-weight:bold; font-size: 18px;">0</span></div>
                     </div>
 
                     <div id="score-box-1" class="score-box score-right"></div>
                     <div id="score-box-0" class="score-box score-bottom"></div>
                 </div>
 
-                <div id="action-status" style="color:#ffeb3b; font-size:12px; visibility:hidden; min-height: 15px; margin-bottom: 5px;">他家アクション待機中...</div>
-                <button class="btn" style="padding:4px 8px; font-size:12px; background:#4aa9e6;" onclick="sortMyHand()">理牌</button>
+                <div id="action-status" style="color:#ffeb3b; font-size:14px; visibility:hidden; min-height: 18px; margin-bottom: 5px;">他家アクション待機中...</div>
+                <button class="btn" style="padding:6px 12px; font-size:14px; background:#4aa9e6;" onclick="sortMyHand()">理牌</button>
             </div>
 
-            <!-- 河のプレイヤー名表示を完全に削除し盤面をクリーンに保つ -->
             <div class="river-area" id="river-0"></div>
             <div class="river-area" id="river-1"></div>
             <div class="river-area" id="river-2"></div>
@@ -145,6 +161,7 @@
             
             <div class="action-bar" id="action-bar">
                 <span style="font-weight:bold; margin-right:10px;"><span id="action-msg-text">アクション</span> <span id="action-timer" style="color:red; font-size:18px;">10</span>秒:</span>
+                <button class="btn" id="btn-riichi" style="display:none; background: #ff9800; margin-right: 5px;" onclick="toggleRiichi()">リーチ</button>
                 <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
                 <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
                 <span id="naki-buttons-container"></span>
@@ -226,8 +243,9 @@ function logM(msg) {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
 }
 
-function calculateScore(units, hand, isClosed) {
+function calculateScore(units, hand, isClosed, isRiichi) {
     let han = 0, details = [];
+    if (isRiichi) { han += 1; details.push("リーチ (1翻)"); }
     if (isClosed) { han += 1; details.push("鳴きなし (1翻)"); }
     units.forEach(u => { let unitData = OFFICIAL_UNITS.find(o => o.name === u); let s = unitData ? unitData.score : 0; han += s; details.push(`${u} (${s}翻)`); });
     let usedJoker = hand.some(t => t === "P（ｼﾞｮｰｶｰ）" || t.includes("ｵｰﾙﾏｲﾃｨ"));
@@ -270,7 +288,7 @@ function getWaits(testHand, memo, isClosed) {
         let tHand = [...testHand, tile];
         let res = checkAgari(tHand, memo);
         if (res.isValid) {
-            let score = calculateScore(res.units, tHand, isClosed);
+            let score = calculateScore(res.units, tHand, isClosed, false);
             waits.push({ tile: tile, units: res.units, han: score.han });
         }
     }
@@ -375,10 +393,18 @@ let isWaitingAction = false; let isMyTurnNow = false;
 
 let gameRuleMaxRounds = 1; let currentBakaze = 0; let currentKyoku = 1; let currentDealer = 0;
 let playerScores = [25000, 25000, 25000, 25000];
+let playerRiichi = [false, false, false, false];
+let riichiSticks = 0;
+let riichiDiscardIndex = [-1, -1, -1, -1];
 
 let globalHandLens = [12,12,12,12]; let getHandLens = () => playerHands.map(h => h.length);
 let openTiles = [[], [], [], []]; let getOpenTiles = () => openTiles;
 let globalOpenTiles = [[], [], [], []];
+let globalPlayerRiichi = [false, false, false, false];
+let globalRiichiSticks = 0;
+let globalRiichiDiscardIndex = [-1, -1, -1, -1];
+let isPendingRiichi = false;
+let validRiichiDiscards = [];
 
 let clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
 
@@ -431,6 +457,7 @@ function getCpuDiscard(hand) {
 function initMatch() {
     gameRuleMaxRounds = parseInt(document.getElementById('game-rule').value);
     currentBakaze = 0; currentKyoku = 1; currentDealer = 0; playerScores = [25000, 25000, 25000, 25000];
+    riichiSticks = 0;
     let pNames = [document.getElementById('player-name-input').value || 'ホスト'];
     playerRoles = ['HOST']; 
     clientConns.forEach(c => { playerRoles.push('CLIENT'); pNames.push(clientNamesMap[c.peer] || 'ゲスト'); });
@@ -440,6 +467,7 @@ function initMatch() {
 
 function startKyoku() {
     deck = []; discards = [[],[],[],[]]; openTiles = [[],[],[],[]];
+    playerRiichi = [false, false, false, false]; riichiDiscardIndex = [-1, -1, -1, -1];
     for(let attr in IDOLS) IDOLS[attr].forEach(i => deck.push(i, i));
     SPECIAL_TILES.forEach(s => { for(let i=0; i<s.count; i++) deck.push(s.name); });
     for(let i = deck.length-1; i>0; i--) { let j = Math.floor(Math.random()*(i+1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
@@ -449,7 +477,7 @@ function startKyoku() {
     clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
     
     playerRoles.forEach((role, idx) => {
-        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, handLens: getHandLens(), openTiles: getOpenTiles(), scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer };
+        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, handLens: getHandLens(), openTiles: getOpenTiles(), scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
         if(role === 'HOST') handleHostMsg(msg); else if(role === 'CLIENT') clientConns[idx-1].send(msg);
     });
     setTimeout(nextTurn, 1500);
@@ -458,7 +486,7 @@ function startKyoku() {
 function nextTurn() {
     isWaitingAction = false;
     if(deck.length === 0) { 
-        broadcast({ type: 'KYOKU_OVER', isRyukyoku: true, msg: "流局です", scores: playerScores }); 
+        broadcast({ type: 'KYOKU_OVER', isRyukyoku: true, msg: "流局です", scores: playerScores, riichiSticks: riichiSticks }); 
         prepareNextKyoku(false); 
         return; 
     }
@@ -473,8 +501,24 @@ function nextTurn() {
     if (playerRoles[currentTurn] === 'CPU') {
         setTimeout(() => {
             let fullHand = [...playerHands[currentTurn], ...openTiles[currentTurn]];
-            if (checkAgari(fullHand).isValid) processAgari(currentTurn, true);
-            else processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]));
+            if (checkAgari(fullHand).isValid) {
+                processAgari(currentTurn, true);
+            } else {
+                if (playerRiichi[currentTurn]) {
+                    processDiscard(currentTurn, drawn, false);
+                } else if (openTiles[currentTurn].length === 0) {
+                    let tInfo = getTenpaiInfo(playerHands[currentTurn], [], true);
+                    let validWaits = tInfo.filter(t => t.waits.length > 0);
+                    if (validWaits.length > 0 && playerScores[currentTurn] >= 1000) {
+                        let discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
+                        processDiscard(currentTurn, discardTile, true);
+                    } else {
+                        processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false);
+                    }
+                } else {
+                    processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false);
+                }
+            }
         }, 1200);
     }
 }
@@ -484,26 +528,41 @@ function handleClientMsg(conn, data) {
     if(data.type === 'READY_NEXT') { handleReadyNext(); return; }
     
     let pIdx = clientConns.indexOf(conn) + 1;
-    if(data.type === 'DISCARD' && currentTurn === pIdx) processDiscard(pIdx, data.tile);
+    if(data.type === 'DISCARD' && currentTurn === pIdx) processDiscard(pIdx, data.tile, data.isRiichi);
     if(data.type === 'ACTION') processNakiAction(pIdx, data.action, data.payload);
     if(data.type === 'TSUMO' && currentTurn === pIdx) processAgari(pIdx, true);
 }
 function sendAction(action, payload=null) {
-    if(action === 'DISCARD') { if(isHost) processDiscard(0, payload); else hostConn.send({type:'DISCARD', tile:payload}); }
+    if(action === 'DISCARD') { 
+        let t = payload.tile !== undefined ? payload.tile : payload;
+        let r = payload.isRiichi || false;
+        if(isHost) processDiscard(0, t, r); else hostConn.send({type:'DISCARD', tile: t, isRiichi: r}); 
+    }
     else if(action === 'TSUMO') { if(isHost) processAgari(0, true); else hostConn.send({type:'TSUMO'}); }
     else if(action === 'NAKI') { if(isHost) processNakiAction(0, action, payload); else hostConn.send({type:'ACTION', action:action, payload:payload}); }
     else { if(isHost) processNakiAction(0, action); else hostConn.send({type:'ACTION', action:action}); }
 }
 
-function processDiscard(pIdx, tile) {
+function processDiscard(pIdx, tile, isRiichi = false) {
     if (isWaitingAction) return; 
     let h = playerHands[pIdx]; let tIdx = h.indexOf(tile);
     if(tIdx === -1) return; 
     
+    if (isRiichi && !playerRiichi[pIdx] && playerScores[pIdx] >= 1000) {
+        playerRiichi[pIdx] = true;
+        playerScores[pIdx] -= 1000;
+        riichiSticks++;
+        riichiDiscardIndex[pIdx] = discards[pIdx].length;
+    }
+
     h.splice(tIdx, 1); discards[pIdx].push(tile); currentDiscard = { pIdx, tile };
-    broadcast({ type: 'DISCARDED', pIdx, tile, discards, handLens: getHandLens(), openTiles: getOpenTiles() });
     
-    if (tile === "青葉美咲" || tile === "音無小鳥") {
+    broadcast({ 
+        type: 'DISCARDED', pIdx, tile, discards, handLens: getHandLens(), openTiles: getOpenTiles(),
+        playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex, scores: playerScores
+    });
+    
+    if ((tile === "青葉美咲" || tile === "音無小鳥") && !playerRiichi[pIdx]) {
         if (deck.length < 2) { broadcast({ type: 'MSG', msg: "山札が足りず効果不発。" }); advanceTurnAfterDiscard(); return; }
         clerkState = { active: true, originalPlayer: pIdx, discardsLeft: 2, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
         let d1 = deck.pop(); let d2 = deck.pop(); h.push(d1, d2);
@@ -511,7 +570,7 @@ function processDiscard(pIdx, tile) {
         broadcast({ type: 'CLERK_EFFECT', pIdx: pIdx, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
         let msg = { type: 'CLERK_DRAW', drawn: [d1, d2] };
         if (playerRoles[pIdx] === 'HOST') handleHostMsg(msg); else if (playerRoles[pIdx] === 'CLIENT') clientConns[pIdx-1].send(msg);
-        if (playerRoles[pIdx] === 'CPU') { setTimeout(() => { processDiscard(pIdx, getCpuDiscard(h)); }, 1200); }
+        if (playerRoles[pIdx] === 'CPU') { setTimeout(() => { processDiscard(pIdx, getCpuDiscard(h), false); }, 1200); }
         return; 
     }
     
@@ -528,9 +587,13 @@ function processDiscard(pIdx, tile) {
             if (checkAgari(fullHand).isValid) {
                 nakiResponses.push({ pIdx: idx, action: 'RON' }); 
             } else {
-                let nakiUnits = checkCanNaki(playerHands[idx], tile);
-                if (nakiUnits) nakiResponses.push({ pIdx: idx, action: 'NAKI', payload: nakiUnits[0] });
-                else nakiResponses.push({ pIdx: idx, action: 'SKIP' });
+                if (playerRiichi[idx]) {
+                    nakiResponses.push({ pIdx: idx, action: 'SKIP' });
+                } else {
+                    let nakiUnits = checkCanNaki(playerHands[idx], tile);
+                    if (nakiUnits) nakiResponses.push({ pIdx: idx, action: 'NAKI', payload: nakiUnits[0] });
+                    else nakiResponses.push({ pIdx: idx, action: 'SKIP' });
+                }
             }
         } else {
             let msg = { type: 'ASK_ACTION', discarder: pIdx, tile }; 
@@ -553,7 +616,7 @@ function advanceTurnAfterDiscard() {
             clerkState.interruptedByNaki = false;
             currentTurn = clerkState.originalPlayer;
             broadcast({ type: 'TURN_CONTINUE', pIdx: currentTurn, handLens: getHandLens(), openTiles: getOpenTiles() });
-            if (playerRoles[currentTurn] === 'CPU') { setTimeout(() => { processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn])); }, 1200); }
+            if (playerRoles[currentTurn] === 'CPU') { setTimeout(() => { processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false); }, 1200); }
             return;
         } else {
             let nextP = null;
@@ -590,7 +653,7 @@ function resolveActions() {
         openTiles[nPlayer].push(...usedTiles);
         discards[currentDiscard.pIdx].pop();
         
-        broadcast({ type: 'DISCARD_REMOVED', pIdx: currentDiscard.pIdx, discards: discards, handLens: getHandLens(), openTiles: getOpenTiles() });
+        broadcast({ type: 'DISCARD_REMOVED', pIdx: currentDiscard.pIdx, discards: discards, handLens: getHandLens(), openTiles: getOpenTiles(), playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex, scores: playerScores });
         broadcast({ type: 'MSG', msg: `${globalPlayerNames[nPlayer]} が鳴きました` });
 
         currentTurn = nPlayer;
@@ -599,7 +662,7 @@ function resolveActions() {
         let msg = { type: 'NAKI_TURN', hand: [...playerHands[currentTurn]], unitName: nUnit };
         if (playerRoles[currentTurn] === 'HOST') handleHostMsg(msg); else if (playerRoles[currentTurn] === 'CLIENT') clientConns[currentTurn-1].send(msg);
         
-        if (playerRoles[currentTurn] === 'CPU') { setTimeout(() => { processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn])); }, 1200); }
+        if (playerRoles[currentTurn] === 'CPU') { setTimeout(() => { processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false); }, 1200); }
     } else { 
         advanceTurnAfterDiscard();
     }
@@ -613,14 +676,19 @@ function processAgari(pIdx, isTsumo) {
     let res = checkAgari(fullHand, globalMemo);
     if(res.isValid) {
         let isClosed = openTiles[pIdx].length === 0;
-        let score = calculateScore(res.units, fullHand, isClosed);
+        let score = calculateScore(res.units, fullHand, isClosed, playerRiichi[pIdx]);
         if (isTsumo) {
             let pay = Math.ceil((score.score / 3)/100)*100;
-            for(let i=0; i<4; i++) { if(i === pIdx) playerScores[i] += pay * 3; else playerScores[i] -= pay; }
+            for(let i=0; i<4; i++) { 
+                if(i === pIdx) playerScores[i] += (pay * 3) + (riichiSticks * 1000); 
+                else playerScores[i] -= pay; 
+            }
         } else {
-            playerScores[pIdx] += score.score; playerScores[currentDiscard.pIdx] -= score.score;
+            playerScores[pIdx] += score.score + (riichiSticks * 1000); 
+            playerScores[currentDiscard.pIdx] -= score.score;
         }
-        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score, scores: playerScores });
+        riichiSticks = 0;
+        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score, scores: playerScores, riichiSticks: riichiSticks });
         prepareNextKyoku(pIdx === currentDealer);
     }
 }
@@ -659,6 +727,13 @@ function proceedToNextKyoku() {
 
 /** クライアント描画・UIロジック **/
 let myLocalHand = []; let roleMap = [];
+
+function toggleRiichi() {
+    isPendingRiichi = !isPendingRiichi;
+    let btn = document.getElementById('btn-riichi');
+    btn.style.background = isPendingRiichi ? '#ff5722' : '#ff9800';
+    renderHand(isMyTurnNow);
+}
 
 function toggleLockUnit(unitName) {
     if(lockedUnits.has(unitName)) lockedUnits.delete(unitName); else lockedUnits.add(unitName);
@@ -865,7 +940,6 @@ function updateProgressUI() {
         if(discards[i]) visibleTiles.push(...discards[i]);
     }
 
-    // テンパイナビ
     let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], isMyTurnNow);
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
@@ -967,7 +1041,6 @@ function updateProgressUI() {
         progressData.push({ name: status.unitName, match: potentialMatch, total: status.unit.members.length, ratio: potentialMatch / status.unit.members.length, isLocked: true, missing: finalMissing });
     }
 
-    // ロックされた牌を除外した残りの手牌（これが計算対象）
     let remainingHand = [];
     for (let i = 0; i < tempHand.length; i++) { if (!consumedIndices.has(i)) remainingHand.push(tempHand[i]); }
 
@@ -995,11 +1068,9 @@ function updateProgressUI() {
         }
 
         let ratio = matchCount / unit.members.length;
-        // 51%以上（50%ちょうどの1/2や2/4などは弾くための厳密な不等式）
         if (ratio > 0.50) progressData.push({ name: unit.name, match: matchCount, total: unit.members.length, ratio: ratio, isLocked: false, missing: finalMissing });
     });
     
-    // ソート処理
     progressData.sort((a, b) => {
         let aComp = a.match === a.total ? 1 : 0;
         let bComp = b.match === b.total ? 1 : 0;
@@ -1052,7 +1123,8 @@ function updateScores(scores) {
             let nName = globalPlayerNames[i];
             let isDealer = (i === currentDealer);
             let dealerMark = isDealer ? '<span style="color:#ff7bac; font-weight:bold;">[親]</span> ' : '';
-            box.innerHTML = `<span style="font-size:10px; color:#ccc; display:block; overflow:hidden; text-overflow:ellipsis;">${dealerMark}${nName}</span><span style="color:#ffeb3b; font-size:14px;">${scores[i]}</span>`;
+            let riichiMark = globalPlayerRiichi[i] ? '<span style="color:#ff5722; font-weight:bold;">[立直]</span> ' : '';
+            box.innerHTML = `<span style="font-size:12px; color:#ccc; display:block; overflow:hidden; text-overflow:ellipsis;">${dealerMark}${riichiMark}${nName}</span><span style="color:#ffeb3b; font-size:18px;">${scores[i]}</span>`;
         }
     } 
 }
@@ -1088,6 +1160,7 @@ function startDiscardTimer() {
         document.getElementById('action-timer').innerText = timeLeft;
         if (timeLeft <= 0) { 
             clearInterval(actionTimerInterval); 
+            isPendingRiichi = false;
             autoDiscard(); 
         }
     }, 1000);
@@ -1096,9 +1169,9 @@ function startDiscardTimer() {
 function autoDiscard() {
     let unlocked = getUnlockedHand();
     if (unlocked.length > 0) {
-        sendAction('DISCARD', unlocked[unlocked.length - 1]);
+        sendAction('DISCARD', { tile: unlocked[unlocked.length - 1], isRiichi: false });
     } else {
-        sendAction('DISCARD', myLocalHand[myLocalHand.length - 1]);
+        sendAction('DISCARD', { tile: myLocalHand[myLocalHand.length - 1], isRiichi: false });
     }
     hideActions();
 }
@@ -1106,6 +1179,17 @@ function autoDiscard() {
 function handleHostMsg(data) {
     if (data.handLens) globalHandLens = data.handLens;
     if (data.openTiles) globalOpenTiles = data.openTiles;
+    if (data.playerRiichi) globalPlayerRiichi = data.playerRiichi;
+    if (data.riichiDiscardIndex) globalRiichiDiscardIndex = data.riichiDiscardIndex;
+    if (data.riichiSticks !== undefined) {
+        globalRiichiSticks = data.riichiSticks;
+        document.getElementById('riichi-sticks-count').innerText = globalRiichiSticks;
+    }
+    
+    if (data.scores) {
+        playerScores = data.scores;
+        updateScores(data.scores);
+    }
 
     if(data.type === 'START_KYOKU') {
         globalPlayerNames = data.names; document.getElementById('result-overlay').style.display = 'none';
@@ -1113,9 +1197,8 @@ function handleHostMsg(data) {
         currentDealer = data.dealer;
         document.getElementById('setup-panel').style.display = 'none'; 
         document.getElementById('app-container').style.display = 'flex'; 
-        updateScores(data.scores);
         document.getElementById('deck-count').innerText = data.deckLen; document.getElementById('round-info').innerText = `${ROUND_NAMES[data.bakaze]}${data.kyoku}局`;
-        isMyTurnNow = false; document.getElementById('action-status').style.visibility = 'hidden';
+        isMyTurnNow = false; isPendingRiichi = false; document.getElementById('action-status').style.visibility = 'hidden';
         document.getElementById('river-0').innerHTML=''; document.getElementById('river-1').innerHTML=''; document.getElementById('river-2').innerHTML=''; document.getElementById('river-3').innerHTML='';
         reorderLockedTilesToLeft(); renderHand(false); renderOtherHands();
     }
@@ -1130,8 +1213,8 @@ function handleHostMsg(data) {
     if(data.type === 'DRAWN_TILE') {
         myLocalHand.push(data.tile); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
-        
         let globalMemo = {};
+        
         if(checkAgari(fullHand, globalMemo).isValid) { 
             document.getElementById('action-bar').style.display = 'block'; 
             document.getElementById('action-msg-text').innerText = 'アクション'; 
@@ -1139,8 +1222,27 @@ function handleHostMsg(data) {
             document.getElementById('btn-tsumo').style.display = 'inline-block'; 
             document.getElementById('btn-ron').style.display = 'none'; 
             document.getElementById('btn-skip').style.display = 'none'; 
+            document.getElementById('btn-riichi').style.display = 'none';
             let nakiContainer = document.getElementById('naki-buttons-container');
             if(nakiContainer) nakiContainer.innerHTML = ''; 
+        } else {
+            if (globalPlayerRiichi[myId]) {
+                setTimeout(() => { 
+                    if(isMyTurnNow) { hideActions(); sendAction('DISCARD', { tile: data.tile, isRiichi: false }); }
+                }, 800);
+            } else {
+                if ((globalOpenTiles[myId] || []).length === 0 && playerScores[myId] >= 1000) {
+                    let tInfo = getTenpaiInfo(myLocalHand, [], true);
+                    let validWaits = tInfo.filter(t => t.waits.length > 0);
+                    if (validWaits.length > 0) {
+                        validRiichiDiscards = validWaits.map(w => w.discard);
+                        document.getElementById('action-bar').style.display = 'block';
+                        document.getElementById('action-msg-text').innerText = 'リーチ可能です';
+                        document.getElementById('action-timer').innerText = '';
+                        document.getElementById('btn-riichi').style.display = 'inline-block';
+                    }
+                }
+            }
         }
     }
     
@@ -1151,12 +1253,20 @@ function handleHostMsg(data) {
             isMyTurnNow = false; reorderLockedTilesToLeft(); renderHand(false); 
         }
         const list = data.discards[data.pIdx]; const div = document.getElementById(`river-${getRelPos(data.pIdx)}`); div.innerHTML = '';
-        list.forEach(tile => { div.appendChild(createTileElement(tile)); }); renderOtherHands();
+        list.forEach((tile, idx) => { 
+            let el = createTileElement(tile);
+            if (idx === globalRiichiDiscardIndex[data.pIdx]) el.classList.add('riichi-discard');
+            div.appendChild(el); 
+        }); renderOtherHands();
     }
 
     if(data.type === 'DISCARD_REMOVED') {
         const list = data.discards[data.pIdx]; const div = document.getElementById(`river-${getRelPos(data.pIdx)}`); div.innerHTML = '';
-        list.forEach(tile => { div.appendChild(createTileElement(tile)); }); renderOtherHands();
+        list.forEach((tile, idx) => { 
+            let el = createTileElement(tile);
+            if (idx === globalRiichiDiscardIndex[data.pIdx]) el.classList.add('riichi-discard');
+            div.appendChild(el); 
+        }); renderOtherHands();
     }
 
     if(data.type === 'WAITING_ACTION') { 
@@ -1173,12 +1283,13 @@ function handleHostMsg(data) {
             let globalMemo = {};
             let canRon = checkAgari(fullHand, globalMemo).isValid;
             let unlocked = getUnlockedHand();
-            let nakiUnits = checkCanNaki(unlocked, data.tile);
+            let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile);
 
             if (canRon || nakiUnits) {
                 document.getElementById('action-bar').style.display = 'block';
                 document.getElementById('action-msg-text').innerText = 'アクション';
                 document.getElementById('btn-tsumo').style.display = 'none';
+                document.getElementById('btn-riichi').style.display = 'none';
                 document.getElementById('btn-skip').style.display = 'inline-block';
                 document.getElementById('btn-ron').style.display = canRon ? 'inline-block' : 'none';
                 
@@ -1225,6 +1336,7 @@ function handleHostMsg(data) {
             document.getElementById('btn-tsumo').style.display = 'inline-block'; 
             document.getElementById('btn-ron').style.display = 'none'; 
             document.getElementById('btn-skip').style.display = 'none'; 
+            document.getElementById('btn-riichi').style.display = 'none';
             let nakiContainer = document.getElementById('naki-buttons-container');
             if (nakiContainer) nakiContainer.innerHTML = ''; 
         } else {
@@ -1280,7 +1392,23 @@ function renderHand(isMyTurn) {
     const div = document.getElementById('my-hand-area'); div.innerHTML = '';
     myLocalHand.forEach((tile, idx) => {
         let isLocked = currentLockedIndices.has(idx);
-        let el = createTileElement(tile, true, () => { if(isMyTurn && !isLocked) { hideActions(); sendAction('DISCARD', tile); } });
+        let isClickable = isMyTurn && !isLocked;
+        
+        if (globalPlayerRiichi[myId]) {
+            isClickable = false;
+        }
+
+        if (isPendingRiichi && !validRiichiDiscards.includes(tile)) {
+            isClickable = false;
+        }
+
+        let el = createTileElement(tile, true, () => { 
+            if(isClickable) { 
+                let isRiichiAction = isPendingRiichi;
+                hideActions(); 
+                sendAction('DISCARD', { tile: tile, isRiichi: isRiichiAction }); 
+            } 
+        });
         
         if (isLocked) {
             el.classList.add('locked-tile'); el.style.cursor = 'default';
@@ -1290,7 +1418,9 @@ function renderHand(isMyTurn) {
             el.ondragend = () => { el.style.opacity = '1'; }; el.ondragover = (e) => { e.preventDefault(); };
             el.ondrop = (e) => { e.preventDefault(); let fromIdx = parseInt(e.dataTransfer.getData('text/plain')); if(isNaN(fromIdx) || fromIdx === idx) return; let movingTile = myLocalHand.splice(fromIdx, 1)[0]; myLocalHand.splice(idx, 0, movingTile); reorderLockedTilesToLeft(); renderHand(isMyTurnNow); };
         }
-        if(!isMyTurn) el.classList.add('disabled'); div.appendChild(el);
+        
+        if(!isClickable) el.classList.add('disabled'); 
+        div.appendChild(el);
     });
     
     let myOpen = globalOpenTiles[myId] || [];
@@ -1315,6 +1445,10 @@ function hideActions() {
     document.getElementById('btn-tsumo').style.display = 'none'; 
     document.getElementById('btn-ron').style.display = 'none'; 
     document.getElementById('btn-skip').style.display = 'none'; 
+    document.getElementById('btn-riichi').style.display = 'none';
+    isPendingRiichi = false;
+    let btnRiichi = document.getElementById('btn-riichi');
+    if (btnRiichi) btnRiichi.style.background = '#ff9800';
     let nakiContainer = document.getElementById('naki-buttons-container');
     if (nakiContainer) nakiContainer.innerHTML = '';
     highlightUnit(null);
