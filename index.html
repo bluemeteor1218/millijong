@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出強化・プリロード）</title>
+    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出・符計算）</title>
+    <!-- データと点数計算ロジックの読み込み -->
     <script src="data.js"></script>
+    <script src="score.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
     <style>
@@ -125,12 +127,11 @@
             ・<strong>P（ｼﾞｮｰｶｰ）</strong>: 誰の代わりにもなります。<br>
             ・<strong>青葉美咲 / 音無小鳥</strong>: 捨てると山札から2枚ドローできます。<br>
             <br>
-            <strong>【役と点数（1000点ベース）】</strong><br>
-            ・<strong>ユニット役</strong>: ユニットの人数-2 が翻数になります。<br>
+            <strong>【役と点数（翻・符計算）】</strong><br>
+            ・<strong>ユニット役</strong>: ユニットの人数によって翻と符が変わります（2人=1翻0符, 3人=2翻4符, 4人=3翻8符...等）。<br>
             ・<strong>門前（鳴きなし）</strong>: +1翻<br>
             ・<strong>リーチ</strong>: +1翻（門前テンパイ時のみ。供託1000点消費）<br>
             ・<strong>純愛（ジョーカー不使用）</strong>: +2翻<br>
-            （4翻=満貫 8000点 / 8翻=倍満 16000点 / 13翻=役満 32000点）
         </div>
 
         <hr>
@@ -213,7 +214,6 @@
     </div>
 
 <script>
-// 画像プリロード
 const preloadedImages = [];
 window.addEventListener('load', () => {
     if(typeof ALL_TILE_TYPES !== 'undefined') {
@@ -277,21 +277,6 @@ function showActionToast(text, type = 'turn') {
     setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
-function calculateScore(units, hand, isClosed, isRiichi) {
-    let han = 0, details = [];
-    if (isRiichi) { han += 1; details.push("リーチ (1翻)"); }
-    if (isClosed) { han += 1; details.push("鳴きなし (1翻)"); }
-    units.forEach(u => { let unitData = OFFICIAL_UNITS.find(o => o.name === u); let s = unitData ? unitData.score : 0; han += s; details.push(`${u} (${s}翻)`); });
-    let usedJoker = hand.some(t => t === "P（ｼﾞｮｰｶｰ）" || t.includes("ｵｰﾙﾏｲﾃｨ"));
-    if (!usedJoker) { han += 2; details.push("ジョーカー不使用 (2翻)"); }
-    
-    if (han === 0) return { han, details, rank: "役なし", score: 0 };
-    if (han >= 13) return { han, details, rank: "役満", score: 32000 };
-    if (han >= 8) return { han, details, rank: "倍満", score: 16000 };
-    if (han >= 4) return { han, details, rank: "満貫", score: 8000 };
-    return { han, details, rank: "通常", score: han * 1000 };
-}
-
 function checkAgari(hand, memo = {}, unitStartIndex = 0) {
     if (hand.length === 0) return { isValid: true, units: [] };
     if (hand.length < 2) return { isValid: false, units: [] };
@@ -316,20 +301,21 @@ function checkAgari(hand, memo = {}, unitStartIndex = 0) {
     return memo[key];
 }
 
-function getWaits(testHand, memo, isClosed) {
+function getWaits(testHand, memo, isClosed, pIdx) {
     let waits = [];
+    let isDealer = (pIdx === currentDealer);
     for (let tile of ALL_TILE_TYPES) {
         let tHand = [...testHand, tile];
         let res = checkAgari(tHand, memo);
         if (res.isValid) {
-            let score = calculateScore(res.units, tHand, isClosed, false);
-            waits.push({ tile: tile, units: res.units, han: score.han });
+            let score = calculateMahjongScore(res.units, tHand, isClosed, false, false, isDealer, OFFICIAL_UNITS);
+            waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
         }
     }
     return waits;
 }
 
-function getTenpaiInfo(myHand, myOpen, isMyTurn) {
+function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx) {
     let fullHand = [...myHand, ...myOpen];
     let tenpaiList = [];
     let globalMemo = {}; 
@@ -342,11 +328,11 @@ function getTenpaiInfo(myHand, myOpen, isMyTurn) {
         for (let discardTile of uniqueHand) {
             let testHand = [...fullHand];
             testHand.splice(testHand.indexOf(discardTile), 1);
-            let waits = getWaits(testHand, globalMemo, isClosed);
+            let waits = getWaits(testHand, globalMemo, isClosed, pIdx);
             if (waits.length > 0) tenpaiList.push({ discard: discardTile, waits: waits });
         }
     } else {
-        let waits = getWaits(fullHand, globalMemo, isClosed);
+        let waits = getWaits(fullHand, globalMemo, isClosed, pIdx);
         if (waits.length > 0) tenpaiList.push({ discard: null, waits: waits });
     }
     return tenpaiList;
@@ -418,7 +404,6 @@ function consumeUnitFromHand(hand, unitName, discardedTile) {
     return usedTiles;
 }
 
-// アガリ画面向けの手牌グループ化関数
 function formatResultHand(hand, units) {
     let tempHand = [...hand];
     let grouped = [];
@@ -586,13 +571,14 @@ function nextTurn() {
     if (playerRoles[currentTurn] === 'CPU') {
         setTimeout(() => {
             let fullHand = [...playerHands[currentTurn], ...openTiles[currentTurn]];
-            if (checkAgari(fullHand).isValid) {
+            let globalMemo = {};
+            if (checkAgari(fullHand, globalMemo).isValid) {
                 processAgari(currentTurn, true);
             } else {
                 if (playerRiichi[currentTurn]) {
                     processDiscard(currentTurn, drawn, false);
                 } else if (openTiles[currentTurn].length === 0) {
-                    let tInfo = getTenpaiInfo(playerHands[currentTurn], [], true);
+                    let tInfo = getTenpaiInfo(playerHands[currentTurn], [], true, currentTurn);
                     let validWaits = tInfo.filter(t => t.waits.length > 0);
                     if (validWaits.length > 0 && playerScores[currentTurn] >= 1000) {
                         let discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
@@ -669,7 +655,8 @@ function processDiscard(pIdx, tile, isRiichi = false) {
         if(idx === pIdx) return;
         if (role === 'CPU') { 
             let fullHand = [...playerHands[idx], ...openTiles[idx], tile];
-            if (checkAgari(fullHand).isValid) {
+            let globalMemo = {};
+            if (checkAgari(fullHand, globalMemo).isValid) {
                 nakiResponses.push({ pIdx: idx, action: 'RON' }); 
             } else {
                 if (playerRiichi[idx]) {
@@ -766,21 +753,37 @@ function processAgari(pIdx, isTsumo) {
     let res = checkAgari(fullHand, globalMemo);
     if(res.isValid) {
         let isClosed = openTiles[pIdx].length === 0;
-        let score = calculateScore(res.units, fullHand, isClosed, playerRiichi[pIdx]);
+        let isDealer = (pIdx === currentDealer);
+        
+        // --- 変更点：外部の点数計算ファイル（score.js）を呼び出す ---
+        let scoreInfo = calculateMahjongScore(res.units, fullHand, isClosed, playerRiichi[pIdx], isTsumo, isDealer, OFFICIAL_UNITS);
+        
         if (isTsumo) {
-            let pay = Math.ceil((score.score / 3)/100)*100;
-            for(let i=0; i<4; i++) { 
-                if(i === pIdx) playerScores[i] += (pay * 3) + (riichiSticks * 1000); 
-                else playerScores[i] -= pay; 
+            if (isDealer) {
+                for(let i=0; i<4; i++) { 
+                    if(i === pIdx) playerScores[i] += (scoreInfo.payAll * 3) + (riichiSticks * 1000); 
+                    else playerScores[i] -= scoreInfo.payAll; 
+                }
+            } else {
+                for(let i=0; i<4; i++) { 
+                    if(i === pIdx) playerScores[i] += scoreInfo.score + (riichiSticks * 1000); 
+                    else if(i === currentDealer) playerScores[i] -= scoreInfo.payDealer;
+                    else playerScores[i] -= scoreInfo.payChild;
+                }
             }
         } else {
-            playerScores[pIdx] += score.score + (riichiSticks * 1000); 
-            playerScores[currentDiscard.pIdx] -= score.score;
+            playerScores[pIdx] += scoreInfo.score + (riichiSticks * 1000); 
+            playerScores[currentDiscard.pIdx] -= scoreInfo.score;
         }
         riichiSticks = 0;
         
-        // 追加: units情報をブロードキャストに含める
-        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score, scores: playerScores, riichiSticks: riichiSticks, units: res.units });
+        let legacyScoreObj = {
+            details: scoreInfo.details,
+            rank: scoreInfo.rank,
+            score: scoreInfo.score
+        };
+        
+        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score: legacyScoreObj, scores: playerScores, riichiSticks: riichiSticks, units: res.units });
         prepareNextKyoku(pIdx === currentDealer);
     }
 }
@@ -1032,7 +1035,7 @@ function updateProgressUI() {
         if(discards[i]) visibleTiles.push(...discards[i]);
     }
 
-    let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], isMyTurnNow);
+    let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], isMyTurnNow, myId);
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
         tenpaiDiv.style.marginBottom = '15px';
@@ -1073,7 +1076,7 @@ function updateProgressUI() {
                 let color = '#d32f2f';
                 let fw = 'bold';
                 let uNames = wObj.units.join(' / ');
-                let hanText = `<span style="color:#d32f2f; font-weight:bold; margin-left:4px;">${wObj.han}翻</span>`;
+                let hanText = `<span style="color:#d32f2f; font-weight:bold; margin-left:4px;">${wObj.rank} (${wObj.scoreVal}点)</span>`;
                 return `<div style="margin-top:4px; display:flex; align-items:center; flex-wrap:wrap;"><span style="color:${color}; font-weight:${fw}; display:inline-block; background:#fff; padding:1px 4px; border-radius:3px; margin:0 4px 0 0; border:1px solid #ccc;">${w}(残${rem})</span><span style="font-size:11px; color:#555; display:inline-flex; align-items:center;">役: ${uNames} ${hanText}</span></div>`;
             }).join('');
             
@@ -1219,7 +1222,7 @@ function updateScores(scores) {
             
             box.innerHTML = `<span style="font-size:12px; color:#ccc; display:block; word-break: break-all;">${dealerMark}${riichiMark}${nName}</span><span style="color:#ffeb3b; font-size:18px;">${scores[i]}</span>`;
             
-            if (i === clientCurrentTurn) {
+            if (i === clientCurrentTurn && rel !== 0) {
                 box.classList.add('active-turn');
             } else {
                 box.classList.remove('active-turn');
@@ -1343,7 +1346,7 @@ function handleHostMsg(data) {
                 }, 800);
             } else {
                 if ((globalOpenTiles[myId] || []).length === 0 && playerScores[myId] >= 1000) {
-                    let tInfo = getTenpaiInfo(myLocalHand, [], true);
+                    let tInfo = getTenpaiInfo(myLocalHand, [], true, myId);
                     let validWaits = tInfo.filter(t => t.waits.length > 0);
                     if (validWaits.length > 0) {
                         validRiichiDiscards = validWaits.map(w => w.discard);
@@ -1440,7 +1443,7 @@ function handleHostMsg(data) {
         document.getElementById('action-status').style.visibility = 'hidden';
         myLocalHand = data.hand; 
         if(data.unitName) lockedUnits.add(data.unitName); 
-        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn');
+        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
         let globalMemo = {};
@@ -1477,7 +1480,6 @@ function handleHostMsg(data) {
             setTimeout(() => {
                 document.getElementById('result-winner').innerText = `${pName} のアガリ！`;
                 
-                // 追加: リザルト画面の手牌をユニットごとに分けて表示する処理
                 const resultHandDiv = document.getElementById('result-hand'); 
                 resultHandDiv.innerHTML = '';
                 
@@ -1500,6 +1502,7 @@ function handleHostMsg(data) {
                 });
 
                 document.getElementById('result-yaku').innerHTML = data.score.details.join('<br>'); 
+                // score.jsの連携により「4翻 40符」といった形が .rank に入る
                 document.getElementById('result-score-text').innerText = `${data.score.rank} ${data.score.score}点`; 
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
