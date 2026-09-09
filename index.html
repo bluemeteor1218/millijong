@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ミリオン麻雀</title>
+    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出強化・プリロード）</title>
     <script src="data.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
@@ -25,7 +25,6 @@
         
         #game-board { flex: 1; position: relative; overflow: hidden; background: #0b5b2d; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); display: block; }
         
-        /* 牌の基本サイズを拡大 */
         .mahjong-tile { width: clamp(24px, 4vmin, 38px); height: clamp(34px, 5.6vmin, 54px); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 4px; border: 1px solid #999; box-shadow: 1px 3px 0 #2e8b57, 1px 3px 3px rgba(0,0,0,0.4); display: inline-flex; align-items: center; justify-content: center; margin: 1px; cursor: default; position: relative; box-sizing: border-box; user-select: none; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
         .mahjong-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; pointer-events: none; }
         .mahjong-tile.facedown img { display: none; }
@@ -44,7 +43,6 @@
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
         #my-hand-area { position: absolute; bottom: clamp(5px, 2vh, 15px); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 10px; }
-        /* 自分の手牌をさらに大きく */
         #my-hand-area .mahjong-tile { width: clamp(32px, 5.5vmin, 50px); height: clamp(44px, 7.8vmin, 70px); cursor: grab; }
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
@@ -52,13 +50,11 @@
         #my-hand-area .mahjong-tile.almighty .tile-text { font-size: clamp(16px, 2.4vmin, 22px); }
         
         .other-hand { position: absolute; display: flex; gap: 1px; pointer-events: none; }
-        #hand-1 { top: 50%; left: calc(100% - clamp(25px, 4vmin, 40px)); transform: translate(-50%, -50%) rotate(-90deg); }
-        #hand-2 { top: clamp(10px, 2vh, 25px); left: 50%; transform: translateX(-50%) rotate(180deg); }
-        #hand-3 { top: 50%; left: clamp(25px, 4vmin, 40px); transform: translate(-50%, -50%) rotate(90deg); }
+        #hand-1 { top: 50%; left: calc(100% - clamp(15px, 3vmin, 25px)); transform: translate(-50%, -50%) rotate(-90deg); }
+        #hand-2 { top: clamp(10px, 2vh, 20px); left: 50%; transform: translateX(-50%) rotate(180deg); }
+        #hand-3 { top: 50%; left: clamp(15px, 3vmin, 25px); transform: translate(-50%, -50%) rotate(90deg); }
         
-        /* 捨て牌を1列10個で折り返すように幅を正確に計算 */
         .river-area { position: absolute; width: calc(clamp(24px, 4vmin, 38px) * 10 + 24px); height: calc(clamp(34px, 5.6vmin, 54px) * 3 + 10px); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 0px;}
-        /* 牌が大きくなった分、中央からの距離を広げる */
         #river-0 { top: calc(50% + clamp(150px, 22vmin, 190px)); left: 50%; transform: translateX(-50%); } 
         #river-2 { bottom: calc(50% + clamp(150px, 22vmin, 190px)); left: 50%; transform: translateX(-50%) rotate(180deg); } 
         #river-1 { top: 50%; left: calc(50% + clamp(210px, 32vmin, 280px)); transform: translate(-50%, -50%) rotate(-90deg); } 
@@ -81,13 +77,13 @@
         
         #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300; pointer-events: none; display: flex; flex-direction: column; gap: 5px; align-items: center; }
         
-        #my-turn-toast {
+        #action-toast {
             position: absolute; top: calc(50% + clamp(110px, 18vmin, 150px)); left: 50%; transform: translate(-50%, -50%);
-            background: linear-gradient(135deg, #ff7bac, #e91e63); color: white; padding: 6px 20px; border-radius: 20px;
+            color: white; padding: 6px 20px; border-radius: 20px;
             font-size: 16px; font-weight: bold; pointer-events: none; z-index: 400; opacity: 0; display: none;
-            box-shadow: 0 4px 10px rgba(233, 30, 99, 0.5); border: 2px solid #fff;
+            border: 2px solid #fff;
         }
-        .show-my-turn { display: block !important; animation: floatUpFade 1.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .show-action-toast { display: block !important; animation: floatUpFade 1.5s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes floatUpFade {
             0% { opacity: 0; transform: translate(-50%, 20px) scale(0.8); }
             15% { opacity: 1; transform: translate(-50%, 0) scale(1.1); }
@@ -101,7 +97,7 @@
         @keyframes popIn { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 70% { transform: scale(1.1) rotate(0deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
         
         #result-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 2100; color: white; text-align: center; }
-        #result-hand { display: flex; gap: 4px; margin: 20px 0; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; flex-wrap: wrap; justify-content: center; max-width: 80%;}
+        #result-hand { display: flex; margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; flex-wrap: wrap; justify-content: center; max-width: 90%; gap: 10px; }
         #result-hand .mahjong-tile { width: 40px; height: 56px; font-size: 14px; box-shadow: none; border-color: #555;}
         .result-details { font-size: 20px; line-height: 1.6; }
         .result-score { font-size: 40px; color: #ffeb3b; font-weight: bold; margin-top: 10px; text-shadow: 2px 2px 4px #000;}
@@ -163,7 +159,8 @@
 
         <div id="game-board">
             <div id="toast-container"></div>
-            <div id="my-turn-toast">あなたの番です</div>
+            
+            <div id="action-toast">あなたの番です</div>
 
             <div id="center-status">
                 <div class="center-scores">
@@ -216,9 +213,7 @@
     </div>
 
 <script>
-// ==========================================
-// 牌画像のプリロード（事前読み込み）
-// ==========================================
+// 画像プリロード
 const preloadedImages = [];
 window.addEventListener('load', () => {
     if(typeof ALL_TILE_TYPES !== 'undefined') {
@@ -254,7 +249,6 @@ function logM(msg) {
     setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
 }
 
-// 共通カットイン関数（ロン、ツモ、鳴きで使用）
 function showCutin(text, color) {
     const cutinOverlay = document.getElementById('cutin-overlay'); 
     const cutinText = document.getElementById('cutin-text');
@@ -264,6 +258,23 @@ function showCutin(text, color) {
     cutinOverlay.style.display = 'flex';
     setTimeout(() => { cutinText.style.animation = 'popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'; }, 10);
     setTimeout(() => { cutinOverlay.style.display = 'none'; }, 1200);
+}
+
+function showActionToast(text, type = 'turn') {
+    const toast = document.getElementById('action-toast');
+    toast.innerText = text;
+    if (type === 'scout') {
+        toast.style.background = 'linear-gradient(135deg, #ff9800, #ff5722)';
+        toast.style.boxShadow = '0 4px 10px rgba(255, 152, 0, 0.5)';
+    } else {
+        toast.style.background = 'linear-gradient(135deg, #ff7bac, #e91e63)';
+        toast.style.boxShadow = '0 4px 10px rgba(233, 30, 99, 0.5)';
+    }
+    toast.style.display = 'block';
+    toast.classList.remove('show-action-toast');
+    void toast.offsetWidth; 
+    toast.classList.add('show-action-toast');
+    setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
 function calculateScore(units, hand, isClosed, isRiichi) {
@@ -405,6 +416,56 @@ function consumeUnitFromHand(hand, unitName, discardedTile) {
         if (idx !== -1) { usedTiles.push(hand.splice(idx, 1)[0]); continue; }
     }
     return usedTiles;
+}
+
+// アガリ画面向けの手牌グループ化関数
+function formatResultHand(hand, units) {
+    let tempHand = [...hand];
+    let grouped = [];
+    
+    if (!units || units.length === 0) {
+        tempHand.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999));
+        return [tempHand];
+    }
+
+    for (let unitName of units) {
+        let unitData = OFFICIAL_UNITS.find(u => u.name === unitName);
+        if (!unitData) continue;
+        let reqs = [...unitData.members];
+        let group = [];
+        
+        for (let i = reqs.length - 1; i >= 0; i--) {
+            let idx = tempHand.indexOf(reqs[i]);
+            if (idx !== -1) {
+                group.push(tempHand.splice(idx, 1)[0]);
+                reqs.splice(i, 1);
+            }
+        }
+        for (let i = reqs.length - 1; i >= 0; i--) {
+            let req = reqs[i];
+            let attrAlm = IDOLS.Princess.includes(req) ? "Prｵｰﾙﾏｲﾃｨ" : (IDOLS.Fairy.includes(req) ? "Faｵｰﾙﾏｲﾃｨ" : "Anｵｰﾙﾏｲﾃｨ");
+            let idx = tempHand.indexOf(attrAlm);
+            if (idx !== -1) {
+                group.push(tempHand.splice(idx, 1)[0]);
+                reqs.splice(i, 1);
+            }
+        }
+        for (let i = reqs.length - 1; i >= 0; i--) {
+            let idx = tempHand.indexOf("P（ｼﾞｮｰｶｰ）");
+            if (idx !== -1) {
+                group.push(tempHand.splice(idx, 1)[0]);
+                reqs.splice(i, 1);
+            }
+        }
+        group.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999));
+        grouped.push(group);
+    }
+    
+    if (tempHand.length > 0) {
+        tempHand.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999));
+        grouped.push(tempHand);
+    }
+    return grouped;
 }
 
 let peer, isHost = false, myId = null;
@@ -682,9 +743,8 @@ function resolveActions() {
         
         broadcast({ type: 'DISCARD_REMOVED', pIdx: currentDiscard.pIdx, discards: discards, handLens: getHandLens(), openTiles: getOpenTiles(), playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex, scores: playerScores });
         
-        // 鳴きカットインを全体に送信
-        broadcast({ type: 'CUTIN', text: '鳴き！', color: '#ff9800' });
-        broadcast({ type: 'MSG', msg: `${globalPlayerNames[nPlayer]} が鳴きました` });
+        broadcast({ type: 'ACTION_TOAST', text: 'スカウト！', actionType: 'scout' });
+        broadcast({ type: 'MSG', msg: `${globalPlayerNames[nPlayer]} がスカウトしました` });
 
         currentTurn = nPlayer;
         broadcast({ type: 'TURN_CHANGE', turn: currentTurn, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
@@ -718,7 +778,9 @@ function processAgari(pIdx, isTsumo) {
             playerScores[currentDiscard.pIdx] -= score.score;
         }
         riichiSticks = 0;
-        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score, scores: playerScores, riichiSticks: riichiSticks });
+        
+        // 追加: units情報をブロードキャストに含める
+        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score, scores: playerScores, riichiSticks: riichiSticks, units: res.units });
         prepareNextKyoku(pIdx === currentDealer);
     }
 }
@@ -763,15 +825,6 @@ function toggleRiichi() {
     let btn = document.getElementById('btn-riichi');
     btn.style.background = isPendingRiichi ? '#ff5722' : '#ff9800';
     renderHand(isMyTurnNow);
-}
-
-function showMyTurnToast() {
-    const toast = document.getElementById('my-turn-toast');
-    toast.style.display = 'block';
-    toast.classList.remove('show-my-turn');
-    void toast.offsetWidth; 
-    toast.classList.add('show-my-turn');
-    setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
 function toggleLockUnit(unitName) {
@@ -1237,8 +1290,8 @@ function handleHostMsg(data) {
         updateScores(data.scores);
     }
 
-    if (data.type === 'CUTIN') {
-        showCutin(data.text, data.color);
+    if (data.type === 'ACTION_TOAST') {
+        showActionToast(data.text, data.actionType);
     }
 
     if(data.type === 'START_KYOKU') {
@@ -1268,7 +1321,7 @@ function handleHostMsg(data) {
     
     if(data.type === 'DRAWN_TILE') {
         myLocalHand.push(data.tile); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
-        showMyTurnToast(); 
+        showActionToast('あなたの番です', 'turn'); 
         
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         let globalMemo = {};
@@ -1332,10 +1385,10 @@ function handleHostMsg(data) {
         statusEl.innerText = '他家アクション待機中...'; statusEl.style.color = '#ffeb3b'; statusEl.style.visibility = 'visible'; 
     }
     if(data.type === 'CLERK_EFFECT') { document.getElementById('deck-count').innerText = data.deckLen; renderOtherHands(); }
-    if(data.type === 'CLERK_DRAW') { myLocalHand.push(...data.drawn); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showMyTurnToast(); }
+    if(data.type === 'CLERK_DRAW') { myLocalHand.push(...data.drawn); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn'); }
     if(data.type === 'TURN_CONTINUE') { 
         clientCurrentTurn = data.pIdx; updateScores(playerScores);
-        if(data.pIdx === myId) { isMyTurnNow = true; renderHand(true); showMyTurnToast(); } 
+        if(data.pIdx === myId) { isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn'); } 
         renderOtherHands(); 
     }
     
@@ -1369,7 +1422,7 @@ function handleHostMsg(data) {
                         btn.className = 'btn';
                         btn.style.background = '#ff9800';
                         btn.style.marginRight = '5px';
-                        btn.innerText = `${u}で鳴く`;
+                        btn.innerText = `${u}でスカウト`;
                         btn.onclick = () => { sendAction('NAKI', u); hideActions(); };
                         btn.onmouseenter = () => highlightNakiUnit(u, data.tile);
                         btn.onmouseleave = () => highlightUnit(null);
@@ -1387,7 +1440,7 @@ function handleHostMsg(data) {
         document.getElementById('action-status').style.visibility = 'hidden';
         myLocalHand = data.hand; 
         if(data.unitName) lockedUnits.add(data.unitName); 
-        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showMyTurnToast();
+        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn');
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
         let globalMemo = {};
@@ -1423,10 +1476,31 @@ function handleHostMsg(data) {
             showCutin(data.isTsumo ? 'ツモ！' : 'ロン！', data.isTsumo ? '#4aa9e6' : '#ff0055');
             setTimeout(() => {
                 document.getElementById('result-winner').innerText = `${pName} のアガリ！`;
-                const resultHandDiv = document.getElementById('result-hand'); resultHandDiv.innerHTML = '';
-                let finalHand = [...data.hand]; finalHand.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999));
-                finalHand.forEach(tile => { resultHandDiv.appendChild(createTileElement(tile, true)); });
-                document.getElementById('result-yaku').innerHTML = data.score.details.join('<br>'); document.getElementById('result-score-text').innerText = `${data.score.rank} ${data.score.score}点`; 
+                
+                // 追加: リザルト画面の手牌をユニットごとに分けて表示する処理
+                const resultHandDiv = document.getElementById('result-hand'); 
+                resultHandDiv.innerHTML = '';
+                
+                let groupedHand = formatResultHand(data.hand, data.units);
+                groupedHand.forEach(group => {
+                    let groupWrap = document.createElement('div');
+                    groupWrap.style.display = 'flex';
+                    groupWrap.style.gap = '2px';
+                    groupWrap.style.margin = '4px';
+                    groupWrap.style.padding = '4px 6px';
+                    groupWrap.style.background = 'rgba(0,0,0,0.4)';
+                    groupWrap.style.borderRadius = '8px';
+                    groupWrap.style.border = '1px solid #555';
+                    
+                    group.forEach(tile => {
+                        let el = createTileElement(tile, true);
+                        groupWrap.appendChild(el);
+                    });
+                    resultHandDiv.appendChild(groupWrap);
+                });
+
+                document.getElementById('result-yaku').innerHTML = data.score.details.join('<br>'); 
+                document.getElementById('result-score-text').innerText = `${data.score.rank} ${data.score.score}点`; 
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
                 document.getElementById('result-overlay').style.display = 'flex';
