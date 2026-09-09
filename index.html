@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出・符計算）</title>
+    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出・本格符計算）</title>
     <!-- データと点数計算ロジックの読み込み -->
     <script src="data.js"></script>
     <script src="score.js"></script>
@@ -128,10 +128,10 @@
             ・<strong>青葉美咲 / 音無小鳥</strong>: 捨てると山札から2枚ドローできます。<br>
             <br>
             <strong>【役と点数（翻・符計算）】</strong><br>
-            ・<strong>ユニット役</strong>: ユニットの人数によって翻と符が変わります（2人=1翻0符, 3人=2翻4符, 4人=3翻8符...等）。<br>
-            ・<strong>門前（鳴きなし）</strong>: +1翻<br>
+            ・<strong>ユニット役</strong>: ユニットの人数によって翻と符が変わります（2人=0翻0符, 3人=1翻/明2符, 4人=2翻/明8符...等。最低でも計1翻以上必要）。<br>
+            ・<strong>門前（鳴きなし）</strong>: +1翻 / 門前ロンは +10符<br>
             ・<strong>リーチ</strong>: +1翻（門前テンパイ時のみ。供託1000点消費）<br>
-            ・<strong>純愛（ジョーカー不使用）</strong>: +2翻<br>
+            ・<strong>純愛（ジョーカー不使用）</strong>: +1翻<br>
         </div>
 
         <hr>
@@ -160,7 +160,6 @@
 
         <div id="game-board">
             <div id="toast-container"></div>
-            
             <div id="action-toast">あなたの番です</div>
 
             <div id="center-status">
@@ -214,6 +213,7 @@
     </div>
 
 <script>
+// 画像プリロード
 const preloadedImages = [];
 window.addEventListener('load', () => {
     if(typeof ALL_TILE_TYPES !== 'undefined') {
@@ -277,6 +277,7 @@ function showActionToast(text, type = 'turn') {
     setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
+// 役構成の基本チェック
 function checkAgari(hand, memo = {}, unitStartIndex = 0) {
     if (hand.length === 0) return { isValid: true, units: [] };
     if (hand.length < 2) return { isValid: false, units: [] };
@@ -301,15 +302,18 @@ function checkAgari(hand, memo = {}, unitStartIndex = 0) {
     return memo[key];
 }
 
-function getWaits(testHand, memo, isClosed, pIdx) {
+// 外部ファイル化したスコア計算をかませて、役（ハン）が1以上あるか確認する
+function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = []) {
     let waits = [];
     let isDealer = (pIdx === currentDealer);
     for (let tile of ALL_TILE_TYPES) {
         let tHand = [...testHand, tile];
         let res = checkAgari(tHand, memo);
         if (res.isValid) {
-            let score = calculateMahjongScore(res.units, tHand, isClosed, false, false, isDealer, OFFICIAL_UNITS);
-            waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
+            let score = calculateMahjongScore(res.units, tHand, openTilesArr, tile, isClosed, false, false, isDealer, OFFICIAL_UNITS);
+            if (score.han > 0) {
+                waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
+            }
         }
     }
     return waits;
@@ -328,22 +332,40 @@ function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx) {
         for (let discardTile of uniqueHand) {
             let testHand = [...fullHand];
             testHand.splice(testHand.indexOf(discardTile), 1);
-            let waits = getWaits(testHand, globalMemo, isClosed, pIdx);
+            let waits = getWaits(testHand, globalMemo, isClosed, pIdx, myOpen);
             if (waits.length > 0) tenpaiList.push({ discard: discardTile, waits: waits });
         }
     } else {
-        let waits = getWaits(fullHand, globalMemo, isClosed, pIdx);
+        let waits = getWaits(fullHand, globalMemo, isClosed, pIdx, myOpen);
         if (waits.length > 0) tenpaiList.push({ discard: null, waits: waits });
     }
     return tenpaiList;
 }
 
 function checkCanNaki(unlockedHand, tile) {
-    let testHand = [...unlockedHand, tile];
     let nakiUnits = [];
     for (let unit of OFFICIAL_UNITS) {
         if (unit.members.length >= 3) {
-            if (tryExtract(testHand, unit.members) && !tryExtract(unlockedHand, unit.members)) {
+            let canNakiThisUnit = false;
+            for (let i = 0; i < unit.members.length; i++) {
+                let req = unit.members[i];
+                let canSubstitute = false;
+                if (req === tile) canSubstitute = true;
+                else if (tile === "P（ｼﾞｮｰｶｰ）") canSubstitute = true;
+                else if (tile === "Prｵｰﾙﾏｲﾃｨ" && IDOLS.Princess.includes(req)) canSubstitute = true;
+                else if (tile === "Faｵｰﾙﾏｲﾃｨ" && IDOLS.Fairy.includes(req)) canSubstitute = true;
+                else if (tile === "Anｵｰﾙﾏｲﾃｨ" && IDOLS.Angel.includes(req)) canSubstitute = true;
+                
+                if (canSubstitute) {
+                    let remainingReqs = [...unit.members];
+                    remainingReqs.splice(i, 1);
+                    if (tryExtract(unlockedHand, remainingReqs)) {
+                        canNakiThisUnit = true;
+                        break;
+                    }
+                }
+            }
+            if (canNakiThisUnit) {
                 nakiUnits.push(unit.name);
             }
         }
@@ -572,23 +594,28 @@ function nextTurn() {
         setTimeout(() => {
             let fullHand = [...playerHands[currentTurn], ...openTiles[currentTurn]];
             let globalMemo = {};
-            if (checkAgari(fullHand, globalMemo).isValid) {
-                processAgari(currentTurn, true);
-            } else {
-                if (playerRiichi[currentTurn]) {
-                    processDiscard(currentTurn, drawn, false);
-                } else if (openTiles[currentTurn].length === 0) {
-                    let tInfo = getTenpaiInfo(playerHands[currentTurn], [], true, currentTurn);
-                    let validWaits = tInfo.filter(t => t.waits.length > 0);
-                    if (validWaits.length > 0 && playerScores[currentTurn] >= 1000) {
-                        let discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
-                        processDiscard(currentTurn, discardTile, true);
-                    } else {
-                        processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false);
-                    }
+            let agariCheck = checkAgari(fullHand, globalMemo);
+            if (agariCheck.isValid) {
+                let isClosed = openTiles[currentTurn].length === 0;
+                let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, openTiles[currentTurn], drawn, isClosed, playerRiichi[currentTurn], true, (currentTurn === currentDealer), OFFICIAL_UNITS);
+                if (scoreInfo.han > 0) {
+                    processAgari(currentTurn, true);
+                    return;
+                }
+            }
+            if (playerRiichi[currentTurn]) {
+                processDiscard(currentTurn, drawn, false);
+            } else if (openTiles[currentTurn].length === 0) {
+                let tInfo = getTenpaiInfo(playerHands[currentTurn], [], true, currentTurn);
+                let validWaits = tInfo.filter(t => t.waits.length > 0);
+                if (validWaits.length > 0 && playerScores[currentTurn] >= 1000) {
+                    let discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
+                    processDiscard(currentTurn, discardTile, true);
                 } else {
                     processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false);
                 }
+            } else {
+                processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn]), false);
             }
         }, 1200);
     }
@@ -656,8 +683,15 @@ function processDiscard(pIdx, tile, isRiichi = false) {
         if (role === 'CPU') { 
             let fullHand = [...playerHands[idx], ...openTiles[idx], tile];
             let globalMemo = {};
-            if (checkAgari(fullHand, globalMemo).isValid) {
-                nakiResponses.push({ pIdx: idx, action: 'RON' }); 
+            let agariCheck = checkAgari(fullHand, globalMemo);
+            if (agariCheck.isValid) {
+                let isClosed = openTiles[idx].length === 0;
+                let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, openTiles[idx], tile, isClosed, playerRiichi[idx], false, (idx === currentDealer), OFFICIAL_UNITS);
+                if (scoreInfo.han > 0) {
+                    nakiResponses.push({ pIdx: idx, action: 'RON' }); 
+                } else {
+                    nakiResponses.push({ pIdx: idx, action: 'SKIP' });
+                }
             } else {
                 if (playerRiichi[idx]) {
                     nakiResponses.push({ pIdx: idx, action: 'SKIP' });
@@ -747,7 +781,8 @@ function resolveActions() {
 
 function processAgari(pIdx, isTsumo) {
     let fullHand = [...playerHands[pIdx], ...openTiles[pIdx]]; 
-    if(!isTsumo) fullHand.push(currentDiscard.tile); 
+    let agariTile = isTsumo ? playerHands[pIdx][playerHands[pIdx].length - 1] : currentDiscard.tile;
+    if(!isTsumo) fullHand.push(agariTile); 
     
     let globalMemo = {};
     let res = checkAgari(fullHand, globalMemo);
@@ -755,9 +790,9 @@ function processAgari(pIdx, isTsumo) {
         let isClosed = openTiles[pIdx].length === 0;
         let isDealer = (pIdx === currentDealer);
         
-        // --- 変更点：外部の点数計算ファイル（score.js）を呼び出す ---
-        let scoreInfo = calculateMahjongScore(res.units, fullHand, isClosed, playerRiichi[pIdx], isTsumo, isDealer, OFFICIAL_UNITS);
-        
+        let scoreInfo = calculateMahjongScore(res.units, fullHand, openTiles[pIdx], agariTile, isClosed, playerRiichi[pIdx], isTsumo, isDealer, OFFICIAL_UNITS);
+        if(scoreInfo.han === 0) return; // 役なしはアガれない
+
         if (isTsumo) {
             if (isDealer) {
                 for(let i=0; i<4; i++) { 
@@ -1222,7 +1257,7 @@ function updateScores(scores) {
             
             box.innerHTML = `<span style="font-size:12px; color:#ccc; display:block; word-break: break-all;">${dealerMark}${riichiMark}${nName}</span><span style="color:#ffeb3b; font-size:18px;">${scores[i]}</span>`;
             
-            if (i === clientCurrentTurn && rel !== 0) {
+            if (i === clientCurrentTurn) {
                 box.classList.add('active-turn');
             } else {
                 box.classList.remove('active-turn');
@@ -1328,33 +1363,41 @@ function handleHostMsg(data) {
         
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         let globalMemo = {};
+        let agariCheck = checkAgari(fullHand, globalMemo);
         
-        if(checkAgari(fullHand, globalMemo).isValid) { 
-            document.getElementById('action-bar').style.display = 'block'; 
-            document.getElementById('action-msg-text').innerText = 'アクション'; 
-            document.getElementById('action-timer').innerText = ''; 
-            document.getElementById('btn-tsumo').style.display = 'inline-block'; 
-            document.getElementById('btn-ron').style.display = 'none'; 
-            document.getElementById('btn-skip').style.display = 'none'; 
-            document.getElementById('btn-riichi').style.display = 'none';
-            let nakiContainer = document.getElementById('naki-buttons-container');
-            if(nakiContainer) nakiContainer.innerHTML = ''; 
+        if(agariCheck.isValid) { 
+            let isClosed = (globalOpenTiles[myId] || []).length === 0;
+            let isDealer = (myId === currentDealer);
+            let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], true, isDealer, OFFICIAL_UNITS);
+            
+            if (scoreInfo.han > 0) {
+                document.getElementById('action-bar').style.display = 'block'; 
+                document.getElementById('action-msg-text').innerText = 'アクション'; 
+                document.getElementById('action-timer').innerText = ''; 
+                document.getElementById('btn-tsumo').style.display = 'inline-block'; 
+                document.getElementById('btn-ron').style.display = 'none'; 
+                document.getElementById('btn-skip').style.display = 'none'; 
+                document.getElementById('btn-riichi').style.display = 'none';
+                let nakiContainer = document.getElementById('naki-buttons-container');
+                if(nakiContainer) nakiContainer.innerHTML = ''; 
+                return;
+            }
+        }
+        
+        if (globalPlayerRiichi[myId]) {
+            setTimeout(() => { 
+                if(isMyTurnNow) { hideActions(); sendAction('DISCARD', { tile: data.tile, isRiichi: false }); }
+            }, 800);
         } else {
-            if (globalPlayerRiichi[myId]) {
-                setTimeout(() => { 
-                    if(isMyTurnNow) { hideActions(); sendAction('DISCARD', { tile: data.tile, isRiichi: false }); }
-                }, 800);
-            } else {
-                if ((globalOpenTiles[myId] || []).length === 0 && playerScores[myId] >= 1000) {
-                    let tInfo = getTenpaiInfo(myLocalHand, [], true, myId);
-                    let validWaits = tInfo.filter(t => t.waits.length > 0);
-                    if (validWaits.length > 0) {
-                        validRiichiDiscards = validWaits.map(w => w.discard);
-                        document.getElementById('action-bar').style.display = 'block';
-                        document.getElementById('action-msg-text').innerText = 'リーチ可能です';
-                        document.getElementById('action-timer').innerText = '';
-                        document.getElementById('btn-riichi').style.display = 'inline-block';
-                    }
+            if ((globalOpenTiles[myId] || []).length === 0 && playerScores[myId] >= 1000) {
+                let tInfo = getTenpaiInfo(myLocalHand, [], true, myId);
+                let validWaits = tInfo.filter(t => t.waits.length > 0);
+                if (validWaits.length > 0) {
+                    validRiichiDiscards = validWaits.map(w => w.discard);
+                    document.getElementById('action-bar').style.display = 'block';
+                    document.getElementById('action-msg-text').innerText = 'リーチ可能です';
+                    document.getElementById('action-timer').innerText = '';
+                    document.getElementById('btn-riichi').style.display = 'inline-block';
                 }
             }
         }
@@ -1399,7 +1442,16 @@ function handleHostMsg(data) {
         if(data.discarder !== myId && roleMap[myId] !== 'CPU') {
             let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || []), data.tile];
             let globalMemo = {};
-            let canRon = checkAgari(fullHand, globalMemo).isValid;
+            let agariCheck = checkAgari(fullHand, globalMemo);
+            let canRon = false;
+            
+            if (agariCheck.isValid) {
+                let isClosed = (globalOpenTiles[myId] || []).length === 0;
+                let isDealer = (myId === currentDealer);
+                let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], false, isDealer, OFFICIAL_UNITS);
+                if (scoreInfo.han > 0) canRon = true;
+            }
+            
             let unlocked = getUnlockedHand();
             let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile);
 
@@ -1443,23 +1495,30 @@ function handleHostMsg(data) {
         document.getElementById('action-status').style.visibility = 'hidden';
         myLocalHand = data.hand; 
         if(data.unitName) lockedUnits.add(data.unitName); 
-        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
+        reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn');
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
         let globalMemo = {};
-        if(checkAgari(fullHand, globalMemo).isValid) { 
-            document.getElementById('action-bar').style.display = 'block'; 
-            document.getElementById('action-msg-text').innerText = 'アクション'; 
-            document.getElementById('action-timer').innerText = ''; 
-            document.getElementById('btn-tsumo').style.display = 'inline-block'; 
-            document.getElementById('btn-ron').style.display = 'none'; 
-            document.getElementById('btn-skip').style.display = 'none'; 
-            document.getElementById('btn-riichi').style.display = 'none';
-            let nakiContainer = document.getElementById('naki-buttons-container');
-            if (nakiContainer) nakiContainer.innerHTML = ''; 
-        } else {
-            startDiscardTimer();
+        let agariCheck = checkAgari(fullHand, globalMemo);
+        if(agariCheck.isValid) { 
+            let isClosed = (globalOpenTiles[myId] || []).length === 0;
+            let isDealer = (myId === currentDealer);
+            let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, globalOpenTiles[myId] || [], null, isClosed, globalPlayerRiichi[myId], false, isDealer, OFFICIAL_UNITS);
+            
+            if (scoreInfo.han > 0) {
+                document.getElementById('action-bar').style.display = 'block'; 
+                document.getElementById('action-msg-text').innerText = 'アクション'; 
+                document.getElementById('action-timer').innerText = ''; 
+                document.getElementById('btn-tsumo').style.display = 'inline-block'; 
+                document.getElementById('btn-ron').style.display = 'none'; 
+                document.getElementById('btn-skip').style.display = 'none'; 
+                document.getElementById('btn-riichi').style.display = 'none';
+                let nakiContainer = document.getElementById('naki-buttons-container');
+                if (nakiContainer) nakiContainer.innerHTML = ''; 
+                return;
+            }
         }
+        startDiscardTimer();
     }
     
     if(data.type === 'KYOKU_OVER') {
@@ -1502,7 +1561,6 @@ function handleHostMsg(data) {
                 });
 
                 document.getElementById('result-yaku').innerHTML = data.score.details.join('<br>'); 
-                // score.jsの連携により「4翻 40符」といった形が .rank に入る
                 document.getElementById('result-score-text').innerText = `${data.score.rank} ${data.score.score}点`; 
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
