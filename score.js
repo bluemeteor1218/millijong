@@ -1,77 +1,96 @@
 // ==========================================
-// 麻雀 点数計算ロジック (score.js)
+// ミリオン麻雀 13枚用・点数計算ロジック (score.js)
 // ==========================================
 
 function calculateMahjongScore(units, fullHand, openTiles, agariTile, isClosed, isRiichi, isTsumo, isDealer, OFFICIAL_UNITS) {
+    // 1. 手牌のユニットを「人数の多い順」に並び替える
+    let unitDetails = units.map(uName => {
+        let data = OFFICIAL_UNITS.find(o => o.name === uName);
+        return { name: uName, len: data ? data.members.length : 0, originalMembers: data ? data.members : [] };
+    }).sort((a, b) => b.len - a.len);
+
+    let details = [];
     let han = 0;
     let fu = 20; // 副底 (ベースの符)
-    let details = [];
 
-    // 1. 状況役の判定
-    if (isRiichi) { han += 1; details.push("リーチ (1翻)"); }
-    if (isClosed && isTsumo) { han += 1; details.push("門前清自摸和 (1翻)"); }
+    // --------------------------------------------------
+    // A. 基準翻数の計算（最大のユニットから算出）
+    // --------------------------------------------------
+    let maxUnit = unitDetails[0];
+    let baseHan = 0;
     
-    // 基本の符加算
-    if (isClosed && !isTsumo) { fu += 10; details.push("門前ロン (+10符)"); }
-    if (isTsumo) { fu += 2; details.push("ツモ (+2符)"); }
-    fu += 2; // 待ち符（ユニット待ちを一律カンチャン・単騎相当とする）
+    // 3人以下は1翻、以降は (人数-2) が基本翻数。13人(MTS等)なら13翻(役満)扱い
+    if (maxUnit.len <= 3) baseHan = 1;
+    else if (maxUnit.len >= 13) baseHan = 13;
+    else baseHan = maxUnit.len - 2; 
+    
+    details.push(`メイン: ${maxUnit.name} (${baseHan}翻)`);
+    han += baseHan;
 
-    // 2. ジョーカーなしボーナス (ハネすぎ防止のため1翻に減少)
-    let usedJoker = fullHand.some(t => t === "P（ｼﾞｮｰｶｰ）" || t.includes("ｵｰﾙﾏｲﾃｨ"));
-    if (!usedJoker) { han += 1; details.push("純愛/ジョーカー不使用 (1翻)"); }
-
-    // 3. ユニットごとの人数による翻・符の細かな調整
+    // --------------------------------------------------
+    // B. 加算符数の計算（残りのユニットの形から算出）
+    // --------------------------------------------------
     let tempOpen = [...openTiles];
     let isAgariTileUsed = false;
     
-    units.forEach(uName => {
-        let unitData = OFFICIAL_UNITS.find(o => o.name === uName);
-        if (!unitData) return;
-        
-        let len = unitData.members.length;
-        
-        // 翻数の計算（2人=0翻, 3人=1翻, 4人=2翻...）
-        let uHan = Math.max(0, len - 2);
-        han += uHan;
-        if (uHan > 0) details.push(`${uName} (${uHan}翻)`);
-        else details.push(`${uName} (0翻)`);
-        
-        // 明ユニット（鳴いた牌）か暗ユニット（手牌）かの推測判定
+    let remainingUnits = unitDetails.slice(1);
+    
+    remainingUnits.forEach(u => {
+        // 明暗（鳴きか門前か）の判定
         let isOpenUnit = false;
         let matchCount = 0;
-        unitData.members.forEach(req => {
+        u.originalMembers.forEach(req => {
             let idx = tempOpen.indexOf(req);
-            if (idx !== -1) {
-                matchCount++;
-                tempOpen.splice(idx, 1);
-            }
+            if (idx !== -1) { matchCount++; tempOpen.splice(idx, 1); }
         });
         
-        if (matchCount > 0 && matchCount >= Math.floor(len / 2)) {
-            isOpenUnit = true; // 鳴き牌を半分以上使っていれば明ユニットとみなす
-        } else if (!isTsumo && !isAgariTileUsed && unitData.members.includes(agariTile)) {
-            isOpenUnit = true; // ロン牌を使ったユニットは明扱い（明刻/明槓相当）
+        // 鳴き牌を使用している、またはロン牌で完成した部分は明扱い
+        if (matchCount > 0 && matchCount >= Math.floor(u.len / 2)) {
+            isOpenUnit = true; 
+        } else if (!isTsumo && !isAgariTileUsed && u.originalMembers.includes(agariTile)) {
+            isOpenUnit = true; 
             isAgariTileUsed = true;
         }
-        
-        // ▼▼ ここを調整することで、人数や明暗による符のバランスを変更できます ▼▼
+
+        // 人数と明暗による符の割り当て
         let uFu = 0;
-        if (len === 3) uFu = isOpenUnit ? 2 : 4;       // 3人: 明刻2符 / 暗刻4符
-        else if (len === 4) uFu = isOpenUnit ? 8 : 16; // 4人: 明槓8符 / 暗槓16符
-        else if (len >= 5) uFu = isOpenUnit ? 16 : 32; // 5人以上: 特大明16符 / 特大暗32符
-        // ▲▲ 調整エリアここまで ▲▲
+        if (u.len === 2)      uFu = 0; // 順子・雀頭相当
+        else if (u.len === 3) uFu = isOpenUnit ? 2 : 4;   // 明刻2符 / 暗刻4符
+        else if (u.len === 4) uFu = isOpenUnit ? 4 : 8;   // 明槓4符 / 暗槓8符
+        else if (u.len === 5) uFu = isOpenUnit ? 8 : 16;  // 5人ユニット
+        else if (u.len >= 6)  uFu = isOpenUnit ? 16 : 32; // 超大型ユニット
         
-        if (uFu > 0) fu += uFu;
+        if (uFu > 0) {
+            fu += uFu;
+            details.push(`サブ: ${u.name} (+${uFu}符)`);
+        } else {
+            details.push(`サブ: ${u.name} (+0符)`);
+        }
     });
 
-    // 4. 符の切り上げ (例: 32符 -> 40符)
+    // 待ち・アガリ方の符加算
+    if (isClosed && !isTsumo) { fu += 10; details.push("門前ロン (+10符)"); }
+    if (isTsumo) { fu += 2; details.push("ツモ (+2符)"); }
+    
+    // 符の切り上げ (例: 32符 -> 40符)
     fu = Math.ceil(fu / 10) * 10;
-    if (fu === 20 && !isTsumo) fu = 30; // 鳴きロンの最低符は30符
+    if (fu === 20 && !isTsumo) fu = 30; // 鳴きロンの最低保証は30符
 
-    // 役が何もない場合はアガれない（0点）
+    // --------------------------------------------------
+    // C. 状況役・ボーナスの加算
+    // --------------------------------------------------
+    if (isRiichi) { han += 1; details.push("リーチ (+1翻)"); }
+    if (isClosed && isTsumo) { han += 1; details.push("門前清自摸和 (+1翻)"); }
+    
+    let usedJoker = fullHand.some(t => t === "P（ｼﾞｮｰｶｰ）" || t.includes("ｵｰﾙﾏｲﾃｨ"));
+    if (!usedJoker) { han += 1; details.push("純愛/ジョーカーなし (+1翻)"); }
+
+    // 役なし判定
     if (han === 0) return { han: 0, fu: 0, details: ["役なし"], rank: "役なし", score: 0, payAll: 0, payDealer: 0, payChild: 0 };
 
-    // 5. 満貫以上の判定
+    // --------------------------------------------------
+    // D. 最終打点（満貫等）の計算
+    // --------------------------------------------------
     let rank = "";
     let basePoint = 0;
 
@@ -80,23 +99,25 @@ function calculateMahjongScore(units, fullHand, openTiles, agariTile, isClosed, 
     else if (han >= 8) { rank = "倍満"; basePoint = 4000; }
     else if (han >= 6) { rank = "跳満"; basePoint = 3000; }
     else {
-        // 基本点の計算: 符 × 2の(2+翻)乗
-        basePoint = fu * Math.pow(2, 2 + han);
+        basePoint = fu * Math.pow(2, 2 + han); // 符 × 2^(2+翻)
         if (basePoint >= 2000) { rank = "満貫"; basePoint = 2000; }
         else { rank = `${han}翻 ${fu}符`; }
     }
 
-    // 6. 親・子ごとの支払い点数の計算
     let totalScore = 0, payAll = 0, payDealer = 0, payChild = 0;
     if (isDealer) {
         totalScore = Math.ceil((basePoint * 6) / 100) * 100;
-        payAll = Math.ceil((basePoint * 2) / 100) * 100; // ツモ時の各自支払い
+        payAll = Math.ceil((basePoint * 2) / 100) * 100; 
     } else {
         totalScore = Math.ceil((basePoint * 4) / 100) * 100;
-        payDealer = Math.ceil((basePoint * 2) / 100) * 100; // ツモ時の親支払い
-        payChild = Math.ceil(basePoint / 100) * 100;        // ツモ時の子支払い
+        payDealer = Math.ceil((basePoint * 2) / 100) * 100; 
+        payChild = Math.ceil(basePoint / 100) * 100;        
     }
 
     details.push(`【 ${rank} 】`);
-    return { han, fu, details, rank, score: totalScore, payAll, payDealer, payChild };
+
+    return { 
+        han, fu, details, rank, 
+        score: totalScore, payAll, payDealer, payChild 
+    };
 }
