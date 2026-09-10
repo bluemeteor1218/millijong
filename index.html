@@ -3,20 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ミリオン麻雀（進捗表示51%以上・厳密化版・リーチ・演出・本格符計算）</title>
+    <title>ミリオン麻雀</title>
     <!-- データと点数計算ロジックの読み込み -->
     <script src="data.js"></script>
     <script src="score.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
     <style>
-        body { font-family: sans-serif; background: #222; color: #333; margin: 0; padding: 0; overflow: hidden; }
-        .panel { background: rgba(255, 255, 255, 0.95); padding: 15px; margin: 10px; border-radius: 8px; position: absolute; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 400px; max-height: 90vh; overflow-y: auto;}
+        body { font-family: sans-serif; background: #222; color: #333; margin: 0; padding: 0; overflow: hidden; touch-action: none; }
+        .panel { background: rgba(255, 255, 255, 0.95); padding: 15px; margin: 10px; border-radius: 8px; position: absolute; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); max-width: 90vw; max-height: 90vh; overflow-y: auto; left: 50%; top: 50%; transform: translate(-50%, -50%);}
         .btn { padding: 8px 16px; background: #ff7bac; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn:hover { background: #e66699; }
         
-        #app-container { display: none; width: 100vw; height: 100vh; flex-direction: row; }
+        #app-container { display: none; width: 100vw; height: 100vh; flex-direction: row; overflow: hidden; position: relative; }
         
+        /* スマホ向けにサイドバーの開閉ボタンを追加 */
+        #mobile-sidebar-toggle { display: none; position: absolute; top: 10px; left: 10px; z-index: 200; background: rgba(0,0,0,0.7); color: white; border: 1px solid #777; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        #sidebar-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 140; }
+
         #progress-sidebar { width: clamp(200px, 25vw, 340px); background: #fdfdfd; border-right: 2px solid #aaa; display: flex; flex-direction: column; padding: clamp(10px, 1.5vw, 15px); box-sizing: border-box; overflow-y: auto; z-index: 150; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
         .progress-header { font-size: clamp(14px, 1.5vw, 18px); font-weight: bold; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
         .progress-item { margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; transition: background 0.2s, border-color 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -44,7 +48,7 @@
         .mahjong-tile.hover-highlight { box-shadow: 0 0 15px #00ffff, 1px 3px 0 #2e8b57; border-color: #00ffff; transform: translateY(-8px); z-index: 10; }
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
-        #my-hand-area { position: absolute; bottom: clamp(5px, 2vh, 15px); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 10px; }
+        #my-hand-area { position: absolute; bottom: clamp(5px, 2vh, 15px); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 10px; width: max-content; }
         #my-hand-area .mahjong-tile { width: clamp(32px, 5.5vmin, 50px); height: clamp(44px, 7.8vmin, 70px); cursor: grab; }
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
@@ -95,26 +99,58 @@
         }
 
         #cutin-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 2000; }
-        #cutin-text { font-size: 120px; font-weight: bold; color: #fff; text-shadow: 0 0 30px #ff0055, 4px 4px 0 #000; transform: scale(0); font-style: italic; letter-spacing: 10px;}
+        #cutin-text { font-size: clamp(60px, 15vw, 120px); font-weight: bold; color: #fff; text-shadow: 0 0 30px #ff0055, 4px 4px 0 #000; transform: scale(0); font-style: italic; letter-spacing: 10px; text-align: center;}
         @keyframes popIn { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 70% { transform: scale(1.1) rotate(0deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
         
         #result-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 2100; color: white; text-align: center; }
-        #result-hand { display: flex; margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; flex-wrap: wrap; justify-content: center; max-width: 90%; gap: 10px; }
-        #result-hand .mahjong-tile { width: 40px; height: 56px; font-size: 14px; box-shadow: none; border-color: #555;}
-        .result-details { font-size: 20px; line-height: 1.6; }
-        .result-score { font-size: 40px; color: #ffeb3b; font-weight: bold; margin-top: 10px; text-shadow: 2px 2px 4px #000;}
+        #result-hand { display: flex; margin: 20px 0; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; flex-wrap: wrap; justify-content: center; max-width: 95%; gap: 5px; }
+        #result-hand .mahjong-tile { width: clamp(24px, 5vw, 40px); height: clamp(34px, 7vw, 56px); font-size: 14px; box-shadow: none; border-color: #555;}
+        .result-details { font-size: clamp(14px, 4vw, 20px); line-height: 1.6; }
+        .result-score { font-size: clamp(24px, 6vw, 40px); color: #ffeb3b; font-weight: bold; margin-top: 10px; text-shadow: 2px 2px 4px #000;}
 
+        /* モバイル向けレスポンシブ最適化 */
         @media screen and (max-width: 800px) {
-            .btn { padding: 6px 12px; font-size: 12px; }
-            .action-bar { bottom: 80px; right: 10px; padding: 10px; }
-            #result-winner { font-size: 24px !important; }
-            .result-score { font-size: 30px !important; }
-            .result-details { font-size: 16px; }
-            .center-scores { grid-template-columns: 85px 105px 85px; gap: 4px; }
+            #mobile-sidebar-toggle { display: block; }
+            #progress-sidebar { position: fixed; left: -100%; top: 0; height: 100vh; width: 280px; max-width: 80vw; transition: left 0.3s ease; box-shadow: none; padding-top: 50px; }
+            #progress-sidebar.open { left: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.7); }
+            #sidebar-overlay.open { display: block; }
+
+            /* 牌の縮小 */
+            .mahjong-tile { width: clamp(16px, 3.2vw, 22px); height: clamp(24px, 4.8vw, 32px); }
+            #my-hand-area .mahjong-tile { width: clamp(26px, 6.5vw, 38px); height: clamp(38px, 9.2vw, 54px); }
+
+            /* 中央枠の縮小と調整 */
+            #center-status { min-width: 140px; padding: 6px; }
+            .center-scores { grid-template-columns: 60px 80px 60px; gap: 2px; }
+            .score-box { max-width: 60px; font-size: 10px; padding: 2px; }
+            .score-box span:last-child { font-size: 14px !important; }
+            #round-info { font-size: 16px !important; }
+            #deck-count { font-size: 14px !important; }
+            #riichi-sticks-count { font-size: 14px !important; }
+
+            /* 捨て牌の距離を縮小 */
+            .river-area { width: calc(clamp(16px, 3.2vw, 22px) * 10 + 20px); height: calc(clamp(24px, 4.8vw, 32px) * 3 + 6px); }
+            #river-0 { top: calc(50% + clamp(90px, 18vw, 120px)); }
+            #river-2 { bottom: calc(50% + clamp(90px, 18vw, 120px)); }
+            #river-1 { left: calc(50% + clamp(110px, 22vw, 150px)); }
+            #river-3 { left: calc(50% - clamp(110px, 22vw, 150px)); }
+
+            /* アクションボタンの中央配置 */
+            .action-bar { right: auto; left: 50%; transform: translateX(-50%); bottom: 90px; width: max-content; max-width: 95vw; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; padding: 10px; flex-direction: row;}
+            #action-msg-text { display: block; width: 100%; text-align: center; margin-bottom: 5px; font-size: 14px; }
+            .btn { padding: 8px 12px; font-size: 14px; }
+            
+            #action-toast { top: calc(50% + clamp(80px, 15vw, 100px)); }
+            #hand-1 { left: calc(100% - clamp(15px, 2.5vw, 25px)); }
+            #hand-3 { left: clamp(15px, 2.5vw, 25px); }
         }
     </style>
 </head>
 <body>
+    <!-- モバイル用サイドバー切り替えボタン -->
+    <button id="mobile-sidebar-toggle" onclick="toggleSidebar()">📋 役・進捗確認</button>
+    <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
     <div class="panel" id="setup-panel">
         <h1 style="margin-top:0; font-size: 20px;">ミリオン麻雀</h1>
         <label style="font-weight:bold; display:block; margin-bottom: 10px;">
@@ -160,6 +196,7 @@
 
         <div id="game-board">
             <div id="toast-container"></div>
+            
             <div id="action-toast">あなたの番です</div>
 
             <div id="center-status">
@@ -190,7 +227,7 @@
             <div class="other-hand" id="hand-3"></div>
             
             <div class="action-bar" id="action-bar">
-                <span style="font-weight:bold; margin-right:10px;"><span id="action-msg-text">アクション</span> <span id="action-timer" style="color:red; font-size:18px;">5</span>秒:</span>
+                <span style="font-weight:bold; margin-right:10px;"><span id="action-msg-text">アクション <span id="action-timer" style="color:red; font-size:18px;">5</span>秒</span></span>
                 <button class="btn" id="btn-riichi" style="display:none; background: #ff9800; margin-right: 5px;" onclick="toggleRiichi()">リーチ</button>
                 <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
                 <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
@@ -203,7 +240,7 @@
     
     <div id="cutin-overlay"><div id="cutin-text">ロン！</div></div>
     <div id="result-overlay">
-        <h2 id="result-winner" style="margin: 0; font-size: 30px; color: #ff7bac;"></h2>
+        <h2 id="result-winner" style="margin: 0; font-size: clamp(20px, 4vw, 30px); color: #ff7bac;"></h2>
         <div id="result-hand"></div>
         <div class="result-details" id="result-yaku"></div>
         <div class="result-score" id="result-score-text"></div>
@@ -224,6 +261,14 @@ window.addEventListener('load', () => {
         });
     }
 });
+
+// モバイル用サイドバー切り替え
+function toggleSidebar() {
+    const sidebar = document.getElementById('progress-sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+}
 
 let useAlmForProgress = true;
 function toggleAlmighty() {
@@ -791,7 +836,7 @@ function processAgari(pIdx, isTsumo) {
         let isDealer = (pIdx === currentDealer);
         
         let scoreInfo = calculateMahjongScore(res.units, fullHand, openTiles[pIdx], agariTile, isClosed, playerRiichi[pIdx], isTsumo, isDealer, OFFICIAL_UNITS);
-        if(scoreInfo.han === 0) return; // 役なしはアガれない
+        if(scoreInfo.han === 0) return; 
 
         if (isTsumo) {
             if (isDealer) {
@@ -1268,33 +1313,32 @@ function updateScores(scores) {
 
 function startActionTimer() {
     let timeLeft = 5; 
-    document.getElementById('action-msg-text').innerText = 'アクション';
-    document.getElementById('action-timer').innerText = timeLeft;
+    document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">${timeLeft}</span>秒`;
     clearInterval(actionTimerInterval);
     
     actionTimerInterval = setInterval(() => {
         timeLeft--; 
-        document.getElementById('action-timer').innerText = timeLeft;
+        let timerEl = document.getElementById('action-timer');
+        if (timerEl) timerEl.innerText = timeLeft;
         if (timeLeft <= 0) { sendAction('SKIP'); hideActions(); }
     }, 1000);
 }
 
 function startDiscardTimer() {
     let timeLeft = 5; 
-    document.getElementById('action-bar').style.display = 'block';
-    document.getElementById('action-msg-text').innerText = '捨てる牌を選択';
+    document.getElementById('action-bar').style.display = 'flex';
+    document.getElementById('action-msg-text').innerHTML = `捨てる牌を選択 <span id="action-timer" style="color:red; font-size:18px;">${timeLeft}</span>秒`;
     document.getElementById('btn-tsumo').style.display = 'none';
     document.getElementById('btn-ron').style.display = 'none';
     let nakiContainer = document.getElementById('naki-buttons-container');
     if (nakiContainer) nakiContainer.innerHTML = '';
     document.getElementById('btn-skip').style.display = 'none';
     
-    document.getElementById('action-timer').innerText = timeLeft;
-    
     clearInterval(actionTimerInterval);
     actionTimerInterval = setInterval(() => {
         timeLeft--; 
-        document.getElementById('action-timer').innerText = timeLeft;
+        let timerEl = document.getElementById('action-timer');
+        if (timerEl) timerEl.innerText = timeLeft;
         if (timeLeft <= 0) { 
             clearInterval(actionTimerInterval); 
             isPendingRiichi = false;
@@ -1371,9 +1415,8 @@ function handleHostMsg(data) {
             let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], true, isDealer, OFFICIAL_UNITS);
             
             if (scoreInfo.han > 0) {
-                document.getElementById('action-bar').style.display = 'block'; 
-                document.getElementById('action-msg-text').innerText = 'アクション'; 
-                document.getElementById('action-timer').innerText = ''; 
+                document.getElementById('action-bar').style.display = 'flex'; 
+                document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">5</span>秒`; 
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
                 document.getElementById('btn-ron').style.display = 'none'; 
                 document.getElementById('btn-skip').style.display = 'none'; 
@@ -1394,9 +1437,8 @@ function handleHostMsg(data) {
                 let validWaits = tInfo.filter(t => t.waits.length > 0);
                 if (validWaits.length > 0) {
                     validRiichiDiscards = validWaits.map(w => w.discard);
-                    document.getElementById('action-bar').style.display = 'block';
-                    document.getElementById('action-msg-text').innerText = 'リーチ可能です';
-                    document.getElementById('action-timer').innerText = '';
+                    document.getElementById('action-bar').style.display = 'flex';
+                    document.getElementById('action-msg-text').innerHTML = `リーチ可能です`;
                     document.getElementById('btn-riichi').style.display = 'inline-block';
                 }
             }
@@ -1456,8 +1498,8 @@ function handleHostMsg(data) {
             let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile);
 
             if (canRon || nakiUnits) {
-                document.getElementById('action-bar').style.display = 'block';
-                document.getElementById('action-msg-text').innerText = 'アクション';
+                document.getElementById('action-bar').style.display = 'flex';
+                document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">5</span>秒`;
                 document.getElementById('btn-tsumo').style.display = 'none';
                 document.getElementById('btn-riichi').style.display = 'none';
                 document.getElementById('btn-skip').style.display = 'inline-block';
@@ -1506,9 +1548,8 @@ function handleHostMsg(data) {
             let scoreInfo = calculateMahjongScore(agariCheck.units, fullHand, globalOpenTiles[myId] || [], null, isClosed, globalPlayerRiichi[myId], false, isDealer, OFFICIAL_UNITS);
             
             if (scoreInfo.han > 0) {
-                document.getElementById('action-bar').style.display = 'block'; 
-                document.getElementById('action-msg-text').innerText = 'アクション'; 
-                document.getElementById('action-timer').innerText = ''; 
+                document.getElementById('action-bar').style.display = 'flex'; 
+                document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">5</span>秒`; 
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
                 document.getElementById('btn-ron').style.display = 'none'; 
                 document.getElementById('btn-skip').style.display = 'none'; 
