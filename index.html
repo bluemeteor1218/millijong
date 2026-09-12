@@ -27,7 +27,7 @@
             :root {
                 --river-y-offset: clamp(130px, 24vh, 210px);
                 --river-x-offset: clamp(110px, 30vw, 200px);
-                --center-scale: 0.62;
+                --center-scale: 0.70;
                 --other-tile-w: clamp(12px, 3.2vmin, 22px);
                 --other-tile-h: clamp(17px, 4.4vmin, 30px);
             }
@@ -37,7 +37,7 @@
             :root {
                 --river-y-offset: clamp(90px, 18vh, 150px);
                 --river-x-offset: clamp(150px, 24vw, 240px);
-                --center-scale: 0.72;
+                --center-scale: 0.78;
             }
         }
 
@@ -71,7 +71,10 @@
         .progress-bar-bg { width: 100%; background: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px;}
         .progress-bar-fill { background: #4caf50; height: 100%; transition: width 0.3s; }
         
-        #game-board { flex: 1; position: relative; overflow: hidden; background: #0b5b2d; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); display: block; touch-action: none; overscroll-behavior: none; }
+        #game-board { flex: 1; position: relative; overflow: hidden; background: #0b5b2d; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); display: flex; flex-direction: column; touch-action: none; overscroll-behavior: none; }
+        #table-area { flex: 1 1 auto; position: relative; min-height: 0; overflow: hidden; }
+        #player-dock { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: center; gap: 8px; padding: 4px 10px calc(8px + env(safe-area-inset-bottom)); background: linear-gradient(to top, rgba(0,0,0,0.4), rgba(0,0,0,0)); z-index: 30; }
+        #btn-sort-hand { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; background: #4aa9e6; min-height: 40px; }
         
         /* 牌の基本デザイン */
         .mahjong-tile { width: var(--other-tile-w); height: var(--other-tile-h); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 4px; border: 1px solid #999; box-shadow: 1px 3px 0 #2e8b57, 1px 3px 3px rgba(0,0,0,0.4); display: inline-flex; align-items: center; justify-content: center; margin: 1px; cursor: default; position: relative; box-sizing: border-box; user-select: none; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
@@ -92,7 +95,7 @@
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
         /* 自分の手牌 */
-        #my-hand-area { position: absolute; bottom: calc(clamp(4px, 1.5vh, 12px) + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 2px; padding: 8px 10px; width: max-content; max-width: calc(100% - 8px); overflow-x: auto; overflow-y: visible; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+        #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; align-items: flex-end; gap: 2px; padding: 4px 0; width: max-content; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: visible; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
         #my-hand-area .mahjong-tile { width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px;}
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
@@ -117,7 +120,7 @@
         #river-3 { top: 50%; left: calc(50% - var(--river-x-offset)); transform: translate(-50%, -50%) rotate(90deg); } 
         
         /* 中央コンソール画面 */
-        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(var(--center-scale)); background: rgba(0,0,0,0.82); color: #fff; padding: 8px; border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 4; min-width: 180px; max-width: min(280px, 70vw); transition: transform 0.2s ease, padding 0.2s ease;}
+        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(var(--center-scale)); background: rgba(0,0,0,0.86); color: #fff; padding: 6px; border-radius: 10px; text-align: center; border: 2px solid #6a6a6a; z-index: 4; min-width: 168px; max-width: min(240px, 62vw); }
         
         .center-scores { display: grid; grid-template-columns: 1fr 1.2fr 1fr; grid-template-rows: auto auto auto; gap: 6px; margin: 12px 0; align-items: center; justify-items: center;}
         .score-box { background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px; font-weight: bold; text-align: center; width: 100%; box-sizing: border-box; border: 2px solid transparent; transition: all 0.2s;}
@@ -133,14 +136,15 @@
         .score-right { grid-column: 3; grid-row: 2; }
         .score-bottom { grid-column: 2; grid-row: 3; }
 
-        #round-info { font-size: clamp(18px, 3vmin, 24px); font-weight: bold; color: #ff7bac; margin-bottom: 2px; }
+        #action-status { color:#ffeb3b; font-size:11px; visibility:hidden; min-height: 0; margin: 2px 0 0; line-height: 1.2; }
+        #round-info { font-size: clamp(16px, 2.6vmin, 22px); font-weight: bold; color: #ff7bac; margin-bottom: 2px; }
         .deck-info { font-size: clamp(12px, 1.8vmin, 14px); color: #ccc; }
         #deck-count { font-size: clamp(16px, 2.5vmin, 20px); font-weight: bold; color: #fff; }
         .kyoutaku-info { font-size: clamp(12px, 1.8vmin, 14px); color: #ccc; margin-top: 4px; }
         #riichi-sticks-count { color: #ff5722; font-weight: bold; font-size: clamp(14px, 2.2vmin, 18px); }
 
         /* アクションボタン（スマホ対応で下部中央へ） */
-        .action-bar { position: absolute; bottom: calc(var(--hand-tile-h) + 24px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: rgba(255, 235, 59, 0.95); padding: 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96vw, 640px); flex-wrap: wrap; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
+        .action-bar { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(255, 235, 59, 0.95); padding: 8px 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96vw, 640px); flex-wrap: wrap; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
         
         #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300; pointer-events: none; display: flex; flex-direction: column; gap: 5px; align-items: center; }
         
@@ -200,14 +204,6 @@
             .center-scores { gap: 4px; margin: 6px 0; }
             .score-box { padding: 4px 5px; }
             #action-status { min-height: 0 !important; margin-bottom: 0 !important; }
-            #btn-sort-hand {
-                position: fixed;
-                right: max(8px, env(safe-area-inset-right));
-                bottom: calc(var(--hand-tile-h) + 18px + env(safe-area-inset-bottom));
-                z-index: 180;
-                min-height: 40px;
-                padding: 6px 12px;
-            }
         }
 
         @media screen and (max-width: 800px) {
@@ -284,44 +280,49 @@
 
         <div id="game-board">
             <div id="toast-container"></div>
-            <div id="action-toast">あなたの番です</div>
 
-            <div id="center-status">
-                <div class="center-scores">
-                    <div id="score-box-2" class="score-box score-top"></div>
-                    <div id="score-box-3" class="score-box score-left"></div>
-                    
-                    <div class="center-info-cell">
-                        <div id="round-info">東1局</div>
-                        <div class="deck-info">残り <span id="deck-count">-</span></div>
-                        <div class="kyoutaku-info">供託: <span id="riichi-sticks-count">0</span></div>
+            <div id="table-area">
+                <div id="action-toast">あなたの番です</div>
+
+                <div id="center-status">
+                    <div class="center-scores">
+                        <div id="score-box-2" class="score-box score-top"></div>
+                        <div id="score-box-3" class="score-box score-left"></div>
+                        
+                        <div class="center-info-cell">
+                            <div id="round-info">東1局</div>
+                            <div class="deck-info">残り <span id="deck-count">-</span></div>
+                            <div class="kyoutaku-info">供託: <span id="riichi-sticks-count">0</span></div>
+                            <div id="action-status">他家アクション待機中...</div>
+                        </div>
+
+                        <div id="score-box-1" class="score-box score-right"></div>
+                        <div id="score-box-0" class="score-box score-bottom"></div>
                     </div>
-
-                    <div id="score-box-1" class="score-box score-right"></div>
-                    <div id="score-box-0" class="score-box score-bottom"></div>
                 </div>
 
-                <div id="action-status" style="color:#ffeb3b; font-size:14px; visibility:hidden; min-height: 18px; margin-bottom: 5px;">他家アクション待機中...</div>
-                <button class="btn" id="btn-sort-hand" style="padding:6px 16px; font-size:14px; background:#4aa9e6;" onclick="sortMyHand()">理牌</button>
+                <div class="river-area" id="river-0"></div>
+                <div class="river-area" id="river-1"></div>
+                <div class="river-area" id="river-2"></div>
+                <div class="river-area" id="river-3"></div>
+                <div class="other-hand" id="hand-1"></div>
+                <div class="other-hand" id="hand-2"></div>
+                <div class="other-hand" id="hand-3"></div>
+
+                <div class="action-bar" id="action-bar">
+                    <span style="font-weight:bold; margin-right:5px; font-size: 14px;"><span id="action-msg-text">アクション</span></span>
+                    <button class="btn" id="btn-riichi" style="display:none; background: #ff9800;" onclick="toggleRiichi()">リーチ</button>
+                    <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
+                    <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
+                    <span id="naki-buttons-container" style="display:flex; gap:5px;"></span>
+                    <button class="btn" id="btn-skip" style="display:none; background: #999;" onclick="sendAction('SKIP'); hideActions();">見逃す</button>
+                </div>
             </div>
 
-            <div class="river-area" id="river-0"></div>
-            <div class="river-area" id="river-1"></div>
-            <div class="river-area" id="river-2"></div>
-            <div class="river-area" id="river-3"></div>
-            <div class="other-hand" id="hand-1"></div>
-            <div class="other-hand" id="hand-2"></div>
-            <div class="other-hand" id="hand-3"></div>
-            
-            <div class="action-bar" id="action-bar">
-                <span style="font-weight:bold; margin-right:5px; font-size: 14px;"><span id="action-msg-text">アクション</span></span>
-                <button class="btn" id="btn-riichi" style="display:none; background: #ff9800;" onclick="toggleRiichi()">リーチ</button>
-                <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
-                <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
-                <span id="naki-buttons-container" style="display:flex; gap:5px;"></span>
-                <button class="btn" id="btn-skip" style="display:none; background: #999;" onclick="sendAction('SKIP'); hideActions();">見逃す</button>
+            <div id="player-dock">
+                <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
+                <div id="my-hand-area"></div>
             </div>
-            <div id="my-hand-area"></div>
         </div>
     </div>
     

@@ -19,20 +19,20 @@ function toggleSidebar() {
 }
 
 function layoutTable() {
-    const board = document.getElementById('game-board');
+    const board = document.getElementById('table-area') || document.getElementById('game-board');
     const center = document.getElementById('center-status');
     const app = document.getElementById('app-container');
     if (!board || !center || !app || app.style.display === 'none') return;
     if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
     const br = board.getBoundingClientRect();
     const cr = center.getBoundingClientRect();
-    const gap = Math.max(12, Math.min(br.width, br.height) * 0.018);
+    const gap = Math.max(10, Math.min(br.width, br.height) * 0.016);
     let yOff = cr.height / 2 + gap;
     let xOff = cr.width / 2 + gap;
-    const maxY = br.height * 0.34;
-    const maxX = br.width * 0.34;
-    const minY = Math.min(br.height * 0.18, 90);
-    const minX = Math.min(br.width * 0.20, 100);
+    const maxY = br.height * 0.32;
+    const maxX = br.width * 0.32;
+    const minY = Math.min(br.height * 0.16, 72);
+    const minX = Math.min(br.width * 0.18, 88);
     yOff = Math.max(minY, Math.min(yOff, maxY));
     xOff = Math.max(minX, Math.min(xOff, maxX));
     board.style.setProperty('--river-y-offset', Math.round(yOff) + 'px');
