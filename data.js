@@ -7,7 +7,8 @@ const SPECIAL_TILES = [
     { name: "Prｵｰﾙﾏｲﾃｨ", count: 1 }, { name: "Faｵｰﾙﾏｲﾃｨ", count: 1 }, { name: "Anｵｰﾙﾏｲﾃｨ", count: 1 }, { name: "P（ｼﾞｮｰｶｰ）", count: 1 },
     { name: "青葉美咲", count: 1 }, { name: "音無小鳥", count: 1 }
 ];
-const ALL_TILE_TYPES = [...IDOLS.Princess, ...IDOLS.Fairy, ...IDOLS.Angel, "Prｵｰﾙﾏｲﾃｨ", "Faｵｰﾙﾏｲﾃｨ", "Anｵｰﾙﾏｲﾃｨ", "P（ｼﾞｮｰｶｰ）"];
+const WAIT_TILE_TYPES = [...IDOLS.Princess, ...IDOLS.Fairy, ...IDOLS.Angel, "Prｵｰﾙﾏｲﾃｨ", "Faｵｰﾙﾏｲﾃｨ", "Anｵｰﾙﾏｲﾃｨ", "P（ｼﾞｮｰｶｰ）"];
+const ALL_TILE_TYPES = [...WAIT_TILE_TYPES, "青葉美咲", "音無小鳥"];
 
 const RAW_UNITS = {
     "LTP02":["天海春香","天空橋朋花","七尾百合子","箱崎星梨花","最上静香"],"LTP03":["我那覇響","春日未来","豊川風花","望月杏奈","横山奈緒"],"LTP04":["如月千早","北沢志保","田中琴葉","所恵美"],"LTP05":["水瀬伊織","エミリー","百瀬莉緒","真壁瑞希"],"LTP06":["星井美希","伊吹翼","北上麗花","ジュリア"],"LTP07":["三浦あずさ","篠宮可憐","高山紗代子","福田のり子"],"LTP08":["高槻やよい","大神環","中谷育","矢吹可奈"],"LTP09":["秋月律子","木下ひなた","佐竹美奈子","松田亜利沙"],"LTP10":["四条貴音","高坂海美","徳川まつり","宮尾美也"],"LTP11":["菊地真","双海真美","島原エレナ","舞浜歩"],"LTP12":["萩原雪歩","周防桃子","二階堂千鶴","ロコ"],"LTP13":["双海亜美","永吉昴","野々原茜","馬場このみ"],
@@ -33,3 +34,9 @@ const OFFICIAL_UNITS = Object.keys(RAW_UNITS).map(name => {
 const SORT_ORDER = {}; let _order = 0;
 IDOLS.Princess.forEach(i => SORT_ORDER[i] = _order++); IDOLS.Fairy.forEach(i => SORT_ORDER[i] = _order++); IDOLS.Angel.forEach(i => SORT_ORDER[i] = _order++); SPECIAL_TILES.forEach(s => SORT_ORDER[s.name] = _order++);
 const ROUND_NAMES = ['東', '南', '西', '北'];
+const UNIT_BY_NAME = {};
+OFFICIAL_UNITS.forEach(u => { UNIT_BY_NAME[u.name] = u; });
+const IDOL_ATTR = {};
+IDOLS.Princess.forEach(n => { IDOL_ATTR[n] = 'Pr'; });
+IDOLS.Fairy.forEach(n => { IDOL_ATTR[n] = 'Fa'; });
+IDOLS.Angel.forEach(n => { IDOL_ATTR[n] = 'An'; });
