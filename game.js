@@ -18,6 +18,27 @@ function toggleSidebar() {
     overlay.classList.toggle('open');
 }
 
+function layoutTable() {
+    const board = document.getElementById('game-board');
+    const center = document.getElementById('center-status');
+    const app = document.getElementById('app-container');
+    if (!board || !center || !app || app.style.display === 'none') return;
+    if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
+    const br = board.getBoundingClientRect();
+    const cr = center.getBoundingClientRect();
+    const gap = Math.max(12, Math.min(br.width, br.height) * 0.018);
+    let yOff = cr.height / 2 + gap;
+    let xOff = cr.width / 2 + gap;
+    const maxY = br.height * 0.34;
+    const maxX = br.width * 0.34;
+    const minY = Math.min(br.height * 0.18, 90);
+    const minX = Math.min(br.width * 0.20, 100);
+    yOff = Math.max(minY, Math.min(yOff, maxY));
+    xOff = Math.max(minX, Math.min(xOff, maxX));
+    board.style.setProperty('--river-y-offset', Math.round(yOff) + 'px');
+    board.style.setProperty('--river-x-offset', Math.round(xOff) + 'px');
+}
+
 let useAlmForProgress = true;
 function toggleAlmighty() {
     useAlmForProgress = !useAlmForProgress;
@@ -1646,7 +1667,8 @@ function handleHostMsg(data) {
         isMyTurnNow = false; isPendingRiichi = false; document.getElementById('action-status').style.visibility = 'hidden';
         document.getElementById('river-0').innerHTML=''; document.getElementById('river-1').innerHTML=''; document.getElementById('river-2').innerHTML=''; document.getElementById('river-3').innerHTML='';
         reorderLockedTilesToLeft(); renderHand(false); renderOtherHands();
-        updateScores(playerScores); 
+        updateScores(playerScores);
+        requestAnimationFrame(() => { layoutTable(); setTimeout(layoutTable, 80); });
     }
     
     if(data.type === 'TURN_CHANGE') { 
@@ -1973,4 +1995,10 @@ if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
         document.documentElement.style.setProperty('--app-h', window.visualViewport.height + 'px');
     });
+}
+
+window.addEventListener('resize', () => requestAnimationFrame(layoutTable));
+window.addEventListener('orientationchange', () => setTimeout(layoutTable, 200));
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => requestAnimationFrame(layoutTable));
 }

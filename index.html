@@ -25,17 +25,19 @@
         /* 縦画面 (スマホ持ち等) */
         @media screen and (max-aspect-ratio: 1/1) {
             :root {
-                --river-y-offset: clamp(90px, 18vh, 160px);
-                --river-x-offset: clamp(85px, 20vw, 150px);
-                --center-scale: 0.85;
+                --river-y-offset: clamp(130px, 24vh, 210px);
+                --river-x-offset: clamp(110px, 30vw, 200px);
+                --center-scale: 0.62;
+                --other-tile-w: clamp(12px, 3.2vmin, 22px);
+                --other-tile-h: clamp(17px, 4.4vmin, 30px);
             }
         }
         /* 横画面 (PC、スマホ横持ち等) */
         @media screen and (min-aspect-ratio: 1/1) {
             :root {
-                --river-y-offset: clamp(70px, 20vh, 130px);
-                --river-x-offset: clamp(140px, 25vw, 240px);
-                --center-scale: 0.75;
+                --river-y-offset: clamp(90px, 18vh, 150px);
+                --river-x-offset: clamp(150px, 24vw, 240px);
+                --center-scale: 0.72;
             }
         }
 
@@ -98,14 +100,14 @@
         #my-hand-area .mahjong-tile.almighty .tile-text { font-size: clamp(16px, 2.4vmin, 22px); }
         
         /* 他家の手牌 */
-        .other-hand { position: absolute; display: flex; gap: 1px; pointer-events: none; }
+        .other-hand { position: absolute; display: flex; gap: 1px; pointer-events: none; z-index: 6; }
         #hand-1 { top: 50%; left: calc(100% - clamp(20px, 4vmin, 35px)); transform: translate(-50%, -50%) rotate(-90deg); }
         #hand-2 { top: clamp(10px, 2vh, 25px); left: 50%; transform: translateX(-50%) rotate(180deg); }
         #hand-3 { top: 50%; left: clamp(20px, 4vmin, 35px); transform: translate(-50%, -50%) rotate(90deg); }
         .other-hand .mahjong-tile { margin: 0; }
         
         /* 捨て牌（河） 10列折り返し制御 */
-        .river-area { position: absolute; width: calc(var(--river-tile-w) * 10); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 0px;}
+        .river-area { position: absolute; width: calc(var(--river-tile-w) * 10); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 0px; z-index: 6; pointer-events: none;}
         .river-area .mahjong-tile { width: var(--river-tile-w); height: var(--river-tile-h); margin: 0; border-width: 1px;}
         
         /* 中心からの変数距離による配置 */
@@ -115,12 +117,12 @@
         #river-3 { top: 50%; left: calc(50% - var(--river-x-offset)); transform: translate(-50%, -50%) rotate(90deg); } 
         
         /* 中央コンソール画面 */
-        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(var(--center-scale)); background: rgba(0,0,0,0.8); color: #fff; padding: 10px; border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 5; min-width: 220px; transition: all 0.3s ease;}
+        #center-status { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(var(--center-scale)); background: rgba(0,0,0,0.82); color: #fff; padding: 8px; border-radius: 8px; text-align: center; border: 2px solid #555; z-index: 4; min-width: 180px; max-width: min(280px, 70vw); transition: transform 0.2s ease, padding 0.2s ease;}
         
         .center-scores { display: grid; grid-template-columns: 1fr 1.2fr 1fr; grid-template-rows: auto auto auto; gap: 6px; margin: 12px 0; align-items: center; justify-items: center;}
         .score-box { background: rgba(0,0,0,0.5); padding: 8px; border-radius: 4px; font-weight: bold; text-align: center; width: 100%; box-sizing: border-box; border: 2px solid transparent; transition: all 0.2s;}
         
-        .score-name { font-size: clamp(10px, 1.5vmin, 12px); color: #ccc; display: block; word-break: break-all; line-height: 1.2; margin-bottom: 2px;}
+        .score-name { font-size: clamp(10px, 1.5vmin, 12px); color: #ccc; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 7.5em; line-height: 1.2; margin-bottom: 2px;}
         .score-val { color: #ffeb3b; font-size: clamp(14px, 2vmin, 20px); font-weight: bold; }
         
         .score-box.active-turn { border-color: #ff0055 !important; background: rgba(255, 0, 85, 0.2) !important; box-shadow: 0 0 10px rgba(255, 0, 85, 0.8); }
@@ -191,6 +193,21 @@
             }
             .btn { font-size: 15px; }
             #center-status { min-width: min(220px, 70vw); }
+        }
+
+        @media screen and (max-width: 800px), screen and (max-aspect-ratio: 1/1) {
+            #center-status { padding: 6px; min-width: 0; max-width: min(240px, 68vw); }
+            .center-scores { gap: 4px; margin: 6px 0; }
+            .score-box { padding: 4px 5px; }
+            #action-status { min-height: 0 !important; margin-bottom: 0 !important; }
+            #btn-sort-hand {
+                position: fixed;
+                right: max(8px, env(safe-area-inset-right));
+                bottom: calc(var(--hand-tile-h) + 18px + env(safe-area-inset-bottom));
+                z-index: 180;
+                min-height: 40px;
+                padding: 6px 12px;
+            }
         }
 
         @media screen and (max-width: 800px) {
@@ -285,7 +302,7 @@
                 </div>
 
                 <div id="action-status" style="color:#ffeb3b; font-size:14px; visibility:hidden; min-height: 18px; margin-bottom: 5px;">他家アクション待機中...</div>
-                <button class="btn" style="padding:6px 16px; font-size:14px; background:#4aa9e6;" onclick="sortMyHand()">理牌</button>
+                <button class="btn" id="btn-sort-hand" style="padding:6px 16px; font-size:14px; background:#4aa9e6;" onclick="sortMyHand()">理牌</button>
             </div>
 
             <div class="river-area" id="river-0"></div>
