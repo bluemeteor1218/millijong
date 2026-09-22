@@ -1,13 +1,19 @@
 // 画像プリロード
 const preloadedImages = [];
 window.addEventListener('load', () => {
-    if(typeof ALL_TILE_TYPES !== 'undefined') {
-        ALL_TILE_TYPES.forEach(tile => {
+    if (typeof ALL_TILE_TYPES === 'undefined') return;
+    const types = ALL_TILE_TYPES;
+    let i = 0;
+    function pump() {
+        const end = Math.min(i + 8, types.length);
+        for (; i < end; i++) {
             const img = new Image();
-            img.src = `idol_images/${tile}.png`;
+            img.src = `idol_images/${types[i]}.png`;
             preloadedImages.push(img);
-        });
+        }
+        if (i < types.length) setTimeout(pump, 40);
     }
+    pump();
 });
 
 // モバイル用サイドバー切り替え
@@ -18,25 +24,19 @@ function toggleSidebar() {
     overlay.classList.toggle('open');
 }
 
+let _layoutLock = false;
 function layoutTable() {
+    if (_layoutLock) return;
+    _layoutLock = true;
+    requestAnimationFrame(() => { _layoutLock = false; });
     const board = document.getElementById('table-area') || document.getElementById('game-board');
     const center = document.getElementById('center-status');
     const app = document.getElementById('app-container');
     if (!board || !center || !app || app.style.display === 'none') return;
     if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
     const br = board.getBoundingClientRect();
-    const cr = center.getBoundingClientRect();
-    const gap = Math.max(10, Math.min(br.width, br.height) * 0.016);
-    let yOff = cr.height / 2 + gap;
-    let xOff = cr.width / 2 + gap;
-    const maxY = br.height * 0.32;
-    const maxX = br.width * 0.32;
-    const minY = Math.min(br.height * 0.16, 72);
-    const minX = Math.min(br.width * 0.18, 88);
-    yOff = Math.max(minY, Math.min(yOff, maxY));
-    xOff = Math.max(minX, Math.min(xOff, maxX));
-    board.style.setProperty('--river-y-offset', Math.round(yOff) + 'px');
-    board.style.setProperty('--river-x-offset', Math.round(xOff) + 'px');
+    const tilt = br.height < 420 ? '48deg' : (br.height < 560 ? '52deg' : '56deg');
+    document.documentElement.style.setProperty('--table-tilt', tilt);
 }
 
 let useAlmForProgress = true;
@@ -180,6 +180,11 @@ function unitsBySizeDesc() {
 function checkAgari(hand, memo = {}) {
     if (hand.length === 0) return { isValid: true, units: [] };
     if (hand.length < 2) return { isValid: false, units: [] };
+    for (let i = 0; i < hand.length; i++) {
+        if (hand[i] === '青葉美咲' || hand[i] === '音無小鳥') {
+            return { isValid: false, units: [] };
+        }
+    }
 
     let key = [...hand].sort().join(',');
     if (memo[key] !== undefined) return memo[key];
@@ -203,49 +208,128 @@ function checkAgari(hand, memo = {}) {
 }
 
 // 外部ファイル化したスコア計算をかませて、役（ハン）が1以上あるか確認する
-function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = []) {
+function candidateWaitTiles(hand) {
+    const pool = Object.create(null);
+    for (let i = 0; i < hand.length; i++) pool[hand[i]] = (pool[hand[i]] || 0) + 1;
+    const cands = new Set();
+    const units = unitsBySizeDesc();
+    for (let u = 0; u < units.length; u++) {
+        const mem = units[u].members;
+        if (mem.length > hand.length + 1) continue;
+        const used = Object.create(null);
+        const miss = [];
+        for (let i = 0; i < mem.length; i++) {
+            const m = mem[i];
+            if ((pool[m] || 0) > (used[m] || 0)) used[m] = (used[m] || 0) + 1;
+            else miss.push(m);
+        }
+        let wild = pool['P（ｼﾞｮｰｶｰ）'] || 0;
+        let pr = pool['Prｵｰﾙﾏｲﾃｨ'] || 0;
+        let fa = pool['Faｵｰﾙﾏｲﾃｨ'] || 0;
+        let an = pool['Anｵｰﾙﾏｲﾃｨ'] || 0;
+        const still = [];
+        for (let i = 0; i < miss.length; i++) {
+            const attr = (typeof IDOL_ATTR !== 'undefined') ? IDOL_ATTR[miss[i]] : null;
+            if (attr === 'Pr' && pr > 0) { pr--; continue; }
+            if (attr === 'Fa' && fa > 0) { fa--; continue; }
+            if (attr === 'An' && an > 0) { an--; continue; }
+            if (wild > 0) { wild--; continue; }
+            still.push(miss[i]);
+        }
+        if (still.length <= 2) {
+            for (let i = 0; i < still.length; i++) cands.add(still[i]);
+            for (let i = 0; i < mem.length; i++) cands.add(mem[i]);
+        }
+    }
+    for (let i = 0; i < hand.length; i++) {
+        const t = hand[i];
+        if (t !== '青葉美咲' && t !== '音無小鳥') cands.add(t);
+    }
+    cands.add('P（ｼﾞｮｰｶｰ）');
+    cands.add('Prｵｰﾙﾏｲﾃｨ');
+    cands.add('Faｵｰﾙﾏｲﾃｨ');
+    cands.add('Anｵｰﾙﾏｲﾃｨ');
+    return [...cands];
+}
+
+function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore = false) {
     let waits = [];
     let isDealer = (pIdx === currentDealer);
-    const waitTiles = (typeof WAIT_TILE_TYPES !== 'undefined') ? WAIT_TILE_TYPES : ALL_TILE_TYPES;
-    for (let tile of waitTiles) {
-        let tHand = [...testHand, tile];
-        let res = checkAgari(tHand, memo);
-        if (res.isValid) {
-            let score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, false, false, isDealer);
+    const waitTiles = candidateWaitTiles(testHand);
+    for (let t = 0; t < waitTiles.length; t++) {
+        const tile = waitTiles[t];
+        const tHand = testHand.concat(tile);
+        const res = checkAgari(tHand, memo);
+        if (!res.isValid) continue;
+        if (withScore) {
+            const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, false, false, isDealer);
             if (score.han > 0) {
                 waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
             }
+        } else {
+            waits.push({ tile: tile, units: res.units, han: 1, fu: 20, rank: '', scoreVal: 0 });
         }
     }
     return waits;
 }
 
-function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx) {
-    let fullHand = [...myHand, ...myOpen];
-    let tenpaiList = [];
-    let globalMemo = {}; 
-    let isClosed = myOpen.length === 0;
-    
+function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx, withScore = false) {
+    const fullHand = myHand.concat(myOpen);
+    const tenpaiList = [];
+    const globalMemo = {};
+    const isClosed = myOpen.length === 0;
     if (checkAgari(fullHand, globalMemo).isValid) return [];
-    
+
     if (isMyTurn) {
-        let uniqueHand = [...new Set(myHand)];
-        for (let discardTile of uniqueHand) {
-            let testHand = [...fullHand];
+        const uniqueHand = [];
+        const seen = Object.create(null);
+        for (let i = 0; i < myHand.length; i++) {
+            if (seen[myHand[i]]) continue;
+            seen[myHand[i]] = 1;
+            uniqueHand.push(myHand[i]);
+        }
+        for (let d = 0; d < uniqueHand.length; d++) {
+            const discardTile = uniqueHand[d];
+            const testHand = fullHand.slice();
             testHand.splice(testHand.indexOf(discardTile), 1);
-            let waits = getWaits(testHand, globalMemo, isClosed, pIdx, myOpen);
+            const waits = getWaits(testHand, globalMemo, isClosed, pIdx, myOpen, withScore);
             if (waits.length > 0) tenpaiList.push({ discard: discardTile, waits: waits });
         }
     } else {
-        let waits = getWaits(fullHand, globalMemo, isClosed, pIdx, myOpen);
+        const waits = getWaits(fullHand, globalMemo, isClosed, pIdx, myOpen, withScore);
         if (waits.length > 0) tenpaiList.push({ discard: null, waits: waits });
     }
     return tenpaiList;
 }
 
+let _unitsByTile = null;
+function unitsPossiblyUsing(tile) {
+    if (!_unitsByTile && typeof OFFICIAL_UNITS !== 'undefined') {
+        _unitsByTile = Object.create(null);
+        for (let i = 0; i < OFFICIAL_UNITS.length; i++) {
+            const u = OFFICIAL_UNITS[i];
+            if (u.members.length < 3) continue;
+            for (let j = 0; j < u.members.length; j++) {
+                const m = u.members[j];
+                if (!_unitsByTile[m]) _unitsByTile[m] = [];
+                _unitsByTile[m].push(u);
+            }
+        }
+    }
+    if (tile === 'P（ｼﾞｮｰｶｰ）') {
+        return OFFICIAL_UNITS.filter(u => u.members.length >= 3);
+    }
+    if (tile === 'Prｵｰﾙﾏｲﾃｨ' || tile === 'Faｵｰﾙﾏｲﾃｨ' || tile === 'Anｵｰﾙﾏｲﾃｨ') {
+        const attr = tile.substring(0, 2);
+        return OFFICIAL_UNITS.filter(u => u.members.length >= 3 && u.members.some(m => IDOL_ATTR[m] === attr));
+    }
+    return (_unitsByTile && _unitsByTile[tile]) || [];
+}
+
 function checkCanNaki(unlockedHand, tile) {
     let nakiUnits = [];
-    for (let unit of OFFICIAL_UNITS) {
+    const unitList = unitsPossiblyUsing(tile);
+    for (let unit of unitList) {
         if (unit.members.length >= 3) {
             let canNakiThisUnit = false;
             for (let i = 0; i < unit.members.length; i++) {
@@ -700,6 +784,7 @@ let selectedHandIdx = -1;
 function discardFromHand(tile) {
     const isRiichiAction = isPendingRiichi;
     selectedHandIdx = -1;
+        _progressKey = "";
     hideActions();
     sendAction('DISCARD', { tile: tile, isRiichi: isRiichiAction });
 }
@@ -1373,6 +1458,18 @@ function getRemaining(req, visibleTiles) {
     return Math.max(0, initialCount - seenCount);
 }
 
+let _progressKey = '';
+let _progressTimer = null;
+function scheduleProgressUI() {
+    const key = myLocalHand.join(',') + '|' + (globalOpenTiles[myId] || []).join(',') + '|' + useAlmForProgress;
+    if (key === _progressKey) return;
+    clearTimeout(_progressTimer);
+    _progressTimer = setTimeout(() => {
+        _progressKey = key;
+        updateProgressUI();
+    }, 220);
+}
+
 function updateProgressUI() {
     const progressList = document.getElementById('progress-list'); progressList.innerHTML = '';
     
@@ -1382,7 +1479,7 @@ function updateProgressUI() {
         if(discards[i]) visibleTiles.push(...discards[i]);
     }
 
-    let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], isMyTurnNow, myId);
+    let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], false, myId, true);
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
         tenpaiDiv.style.marginBottom = '15px';
@@ -1660,6 +1757,8 @@ function handleHostMsg(data) {
         localSkipFuriten = false;
         lastAskCouldRon = false;
         selectedHandIdx = -1;
+        _progressKey = "";
+        _progressKey = "";
         
         document.getElementById('setup-panel').style.display = 'none'; 
         document.getElementById('app-container').style.display = 'flex'; 
@@ -1950,7 +2049,8 @@ function renderHand(isMyTurn) {
             el.ondragstart = (e) => { e.dataTransfer.setData('text/plain', String(idx)); el.style.opacity = '0.5'; };
             el.ondragend = () => { el.style.opacity = '1'; };
             el.ondragover = (e) => { e.preventDefault(); };
-            el.ondrop = (e) => { e.preventDefault(); let fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10); if(isNaN(fromIdx) || fromIdx === idx) return; let movingTile = myLocalHand.splice(fromIdx, 1)[0]; myLocalHand.splice(idx, 0, movingTile); selectedHandIdx = -1; reorderLockedTilesToLeft(); renderHand(isMyTurnNow); };
+            el.ondrop = (e) => { e.preventDefault(); let fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10); if(isNaN(fromIdx) || fromIdx === idx) return; let movingTile = myLocalHand.splice(fromIdx, 1)[0]; myLocalHand.splice(idx, 0, movingTile); selectedHandIdx = -1;
+        _progressKey = ""; reorderLockedTilesToLeft(); renderHand(isMyTurnNow); };
         }
         
         if(!isClickable) el.classList.add('disabled'); 
@@ -1967,10 +2067,7 @@ function renderHand(isMyTurn) {
         });
     }
     
-    clearTimeout(window._progressTimer);
-    window._progressTimer = setTimeout(() => {
-        updateProgressUI();
-    }, 10);
+    scheduleProgressUI();
 }
 
 function hideActions() { 
