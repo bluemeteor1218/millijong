@@ -35,7 +35,7 @@ function layoutTable() {
     if (!board || !center || !app || app.style.display === 'none') return;
     if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
     const br = board.getBoundingClientRect();
-    const tilt = br.height < 420 ? '30deg' : (br.height < 560 ? '34deg' : '36deg');
+    const tilt = br.height < 420 ? '38deg' : (br.height < 560 ? '42deg' : '44deg');
     document.documentElement.style.setProperty('--table-tilt', tilt);
 }
 
