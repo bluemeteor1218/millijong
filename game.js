@@ -1664,7 +1664,8 @@ function updateScores(scores) {
             let dealerMark = isDealer ? '<span style="color:#ff7bac; font-weight:bold;">[親]</span> ' : '';
             let riichiMark = globalPlayerRiichi[i] ? '<span style="color:#ff5722; font-weight:bold;">[立直]</span> ' : '';
             
-            box.innerHTML = `<span class="score-name">${dealerMark}${riichiMark}${nName}</span><span class="score-val">${scores[i]}</span>`;
+            const stick = globalPlayerRiichi[i] ? '<div class="riichi-stick" title="立直棒"></div>' : '';
+            box.innerHTML = `<span class="score-name">${dealerMark}${nName}</span><span class="score-val">${scores[i]}</span>${stick}`;
             
             if (i === clientCurrentTurn) {
                 box.classList.add('active-turn');
