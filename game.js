@@ -480,7 +480,8 @@ let clientCurrentTurn = -1;
 
 let clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
 
-let lockedUnits = new Set(); 
+let lockedUnits = new Set();
+let completedNakiUnits = new Set();
 let currentLockedIndices = new Set();
 let actionTimerInterval = null;
 
@@ -1379,6 +1380,7 @@ function reorderLockedTilesToLeft() {
     }
     
     for (let status of lockedStatus) {
+        if (completedNakiUnits.has(status.unitName)) continue;
         let almCandidates = []; let canComplete = true; let tempConsumed = new Set(consumedIndices);
         for (let req of status.missing) {
             let attrAlm = IDOLS.Princess.includes(req) ? "Prｵｰﾙﾏｲﾃｨ" : (IDOLS.Fairy.includes(req) ? "Faｵｰﾙﾏｲﾃｨ" : "Anｵｰﾙﾏｲﾃｨ");
@@ -1601,7 +1603,7 @@ function updateProgressUI() {
         }
     });
     candidateUnits.forEach(unit => {
-        if (lockedUnits.has(unit.name)) return; 
+        if (lockedUnits.has(unit.name) || completedNakiUnits.has(unit.name)) return;
         
         let tempHandCopy = [...remainingHand];
         let missing = [];
@@ -1769,7 +1771,7 @@ function handleHostMsg(data) {
         const dov = document.getElementById('disconnect-overlay');
         if (dov) dov.style.display = 'none';
         globalPlayerNames = data.names; document.getElementById('result-overlay').style.display = 'none';
-        myId = data.pId; myLocalHand = data.hand; roleMap = data.roles; lockedUnits.clear(); currentLockedIndices.clear();
+        myId = data.pId; myLocalHand = data.hand; roleMap = data.roles; lockedUnits.clear(); completedNakiUnits.clear(); currentLockedIndices.clear();
         currentDealer = data.dealer;
         clientCurrentTurn = data.dealer;
         discards = [[],[],[],[]];
@@ -1939,7 +1941,10 @@ function handleHostMsg(data) {
     if(data.type === 'NAKI_TURN') {
         document.getElementById('action-status').style.visibility = 'hidden';
         myLocalHand = data.hand; 
-        if(data.unitName) lockedUnits.add(data.unitName); 
+        if (data.unitName) {
+            lockedUnits.delete(data.unitName);
+            completedNakiUnits.add(data.unitName);
+        }
         reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn');
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
