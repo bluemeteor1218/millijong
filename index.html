@@ -14,13 +14,13 @@
            レスポンシブ用 変数定義（縦画面・横画面での最適化）
            ========================================= */
         :root {
-            --river-tile-w: clamp(30px, 6.6vmin, 58px);
-            --river-tile-h: clamp(42px, 9.2vmin, 80px);
-            --hand-tile-w: clamp(36px, 7vmin, 58px);
-            --hand-tile-h: clamp(52px, 9.8vmin, 82px);
-            --other-tile-w: clamp(32px, 6.8vmin, 60px);
-            --other-tile-h: clamp(44px, 9.4vmin, 82px);
-            --tile-thick: 18px;
+            --river-tile-w: clamp(20px, 4.4vmin, 39px);
+            --river-tile-h: clamp(28px, 6.1vmin, 53px);
+            --hand-tile-w: clamp(24px, 4.7vmin, 39px);
+            --hand-tile-h: clamp(35px, 6.5vmin, 55px);
+            --other-tile-w: clamp(21px, 4.5vmin, 40px);
+            --other-tile-h: clamp(29px, 6.3vmin, 55px);
+            --tile-depth: clamp(4px, 0.7vmin, 6px);
             --table-tilt: 28deg;
             --center-scale: 0.86;
         }
@@ -30,10 +30,10 @@
             :root {
                 --table-tilt: 26deg;
                 --center-scale: 0.82;
-                --other-tile-w: clamp(26px, 6.4vmin, 48px);
-                --other-tile-h: clamp(38px, 8.8vmin, 68px);
-                --river-tile-w: clamp(24px, 6.2vmin, 46px);
-                --river-tile-h: clamp(36px, 8.6vmin, 66px);
+                --other-tile-w: clamp(17px, 4.3vmin, 32px);
+                --other-tile-h: clamp(25px, 5.9vmin, 45px);
+                --river-tile-w: clamp(16px, 4.1vmin, 31px);
+                --river-tile-h: clamp(24px, 5.7vmin, 44px);
             }
         }
         /* 横画面 (PC、スマホ横持ち等) */
@@ -95,28 +95,28 @@
             border-radius: 0;
         }
         #player-dock { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: center; gap: 8px;
-            min-height: calc(var(--hand-tile-h) + 28px + var(--tile-thick));
+            min-height: calc(var(--hand-tile-h) + 34px + var(--tile-depth));
             padding: 14px 10px calc(12px + env(safe-area-inset-bottom));
             background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0));
             z-index: 30; }
         #btn-sort-hand { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; background: #4aa9e6; min-height: 40px; }
         
         /* 牌の基本デザイン */
-        .mahjong-tile { width: var(--other-tile-w); height: var(--other-tile-h); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 4px; border: 1px solid #999;
-            box-shadow: 2px 10px 10px rgba(0,0,0,0.35);
+        .mahjong-tile { width: var(--other-tile-w); height: var(--other-tile-h); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 3px; border: 1px solid #999;
+            box-shadow: 1px 2px 3px rgba(0,0,0,0.3);
             display: inline-flex; align-items: center; justify-content: center; margin: 1px; cursor: default; position: relative; box-sizing: border-box; user-select: none; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
             transform-style: preserve-3d; }
         .mahjong-tile::after {
-            content: ''; position: absolute; left: 0; right: 0; top: 100%; height: var(--tile-thick);
-            background: linear-gradient(to bottom, #d8d8d8, #8c8c8c 55%, #5e5e5e);
-            border-radius: 0 0 3px 3px; transform: skewX(-18deg); transform-origin: top left;
+            content: ''; position: absolute; left: 0; right: 0; top: 100%; height: var(--tile-depth);
+            background: linear-gradient(to bottom, #d8d8d8, #8c8c8c 70%, #666);
+            border-radius: 0 0 2px 2px; transform: rotateX(-90deg); transform-origin: top center;
         }
         .mahjong-tile::before {
-            content: ''; position: absolute; top: 0; bottom: calc(-1 * var(--tile-thick)); right: 100%; width: calc(var(--tile-thick) * 0.7);
-            background: linear-gradient(to left, #cfcfcf, #7a7a7a);
-            border-radius: 3px 0 0 3px; transform: skewY(-18deg); transform-origin: top right;
+            content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: var(--tile-depth);
+            background: linear-gradient(to right, #b7b7b7, #777);
+            border-radius: 2px 0 0 2px; transform: rotateY(-90deg); transform-origin: left center;
         }
-        .mahjong-tile img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; pointer-events: none; }
+        .mahjong-tile img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; border-radius: 2px; pointer-events: none; }
         .mahjong-tile.facedown img { display: none; }
         .mahjong-tile.riichi-discard { transform: rotate(-90deg); margin: 0 4px; }
         
@@ -125,7 +125,7 @@
         .mahjong-tile.almighty { background: linear-gradient(to bottom, #fff0f5, #ffd6e6); box-shadow: 1px 3px 0 #c22757, 1px 3px 3px rgba(0,0,0,0.4); }
         .mahjong-tile.clerk .tile-text { color: #004d40; }
         .mahjong-tile.clerk { background: linear-gradient(to bottom, #e8f5e9, #c8e6c9); box-shadow: 1px 3px 0 #388e3c, 1px 3px 3px rgba(0,0,0,0.4); }
-        .mahjong-tile.facedown { background: linear-gradient(to bottom, #f0b33a, #c48416); border: 1px solid #b37e14; box-shadow: 2px 10px 10px rgba(0,0,0,0.35); }
+        .mahjong-tile.facedown { background: linear-gradient(to bottom, #f0b33a, #c48416); border: 1px solid #b37e14; box-shadow: 1px 2px 3px rgba(0,0,0,0.3); }
         .mahjong-tile.facedown::after { background: linear-gradient(to bottom, #c48416, #7a520c); }
         .mahjong-tile.facedown::before { background: linear-gradient(to left, #d49220, #7a520c); }
         .mahjong-tile.facedown .tile-text { display: none; }
@@ -135,25 +135,26 @@
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
         /* 自分の手牌 */
-        #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; align-items: flex-end; gap: 2px; padding: 4px 0; width: max-content; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: visible; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
-        #my-hand-area .mahjong-tile { width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px 3px; }
-        #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-10px); }
+        #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; align-items: flex-end; gap: 2px; padding: 14px 0 8px; width: max-content; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+        #my-hand-area .mahjong-tile { width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px 2px; }
+        #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
         #my-hand-area .tile-text { font-size: clamp(12px, 1.8vmin, 16px); }
         #my-hand-area .mahjong-tile.almighty .tile-text { font-size: clamp(16px, 2.4vmin, 22px); }
         
         /* 他家の手牌 */
         .opponent-seat { position: absolute; display: flex; align-items: center; gap: 10px; pointer-events: none; z-index: 6; transform-style: preserve-3d; }
-        #seat-1 { top: 50%; left: 96%; transform: translate(-50%, -50%) rotate(-90deg); }
-        #seat-2 { top: 5%; left: 50%; transform: translate(-50%, 0) rotate(180deg); }
-        #seat-3 { top: 50%; left: 4%; transform: translate(-50%, -50%) rotate(90deg); }
+        #seat-1 { top: 50%; left: 88%; transform: translate(-50%, -50%) rotate(-90deg); }
+        #seat-2 { top: 6%; left: 50%; transform: translate(-50%, 0) rotate(180deg); }
+        #seat-3 { top: 50%; left: 12%; transform: translate(-50%, -50%) rotate(90deg); }
         .other-hand, .meld-area { position: relative; display: flex; flex: 0 0 auto; gap: 3px; transform-style: preserve-3d; }
-        .other-hand .mahjong-tile { margin: 0; transform: rotateX(-55deg); transform-origin: bottom center; }
+        .other-hand .mahjong-tile { margin: 0; }
         
         .meld-area .mahjong-tile { transform: none; }
         
-        .river-area { position: absolute; width: calc(var(--river-tile-w) * 6); display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: flex-start; gap: 2px; z-index: 5; pointer-events: none;}
+        .river-area { position: absolute; width: calc(var(--river-tile-w) * 6 + 10px); display: grid; grid-template-columns: repeat(6, var(--river-tile-w)); grid-auto-rows: var(--river-tile-h); align-content: start; justify-content: start; gap: 2px; z-index: 5; pointer-events: none;}
         .river-area .mahjong-tile { width: var(--river-tile-w); height: var(--river-tile-h); margin: 0; }
+        .river-area .mahjong-tile.riichi-discard { width: var(--river-tile-h); height: var(--river-tile-w); justify-self: center; align-self: center; }
         
         #river-0 { top: 68%; left: 50%; transform: translateX(-50%); }
         #river-2 { top: 25%; left: 50%; transform: translateX(-50%) rotate(180deg); }
@@ -245,8 +246,8 @@
 
         @media (pointer: coarse) {
             :root {
-                --hand-tile-w: clamp(28px, 7.2vw, 48px);
-                --hand-tile-h: clamp(40px, 10vw, 68px);
+                --hand-tile-w: clamp(19px, 4.8vw, 32px);
+                --hand-tile-h: clamp(27px, 6.7vw, 45px);
             }
             .btn { font-size: 15px; }
             #center-status { min-width: min(220px, 70vw); }

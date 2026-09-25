@@ -1380,7 +1380,6 @@ function reorderLockedTilesToLeft() {
     }
     
     for (let status of lockedStatus) {
-        if (completedNakiUnits.has(status.unitName)) continue;
         let almCandidates = []; let canComplete = true; let tempConsumed = new Set(consumedIndices);
         for (let req of status.missing) {
             let attrAlm = IDOLS.Princess.includes(req) ? "Prｵｰﾙﾏｲﾃｨ" : (IDOLS.Fairy.includes(req) ? "Faｵｰﾙﾏｲﾃｨ" : "Anｵｰﾙﾏｲﾃｨ");
@@ -1546,6 +1545,7 @@ function updateProgressUI() {
     let lockedStatus = [];
     
     lockedUnits.forEach(unitName => {
+        if (completedNakiUnits.has(unitName)) return;
         let unit = (typeof UNIT_BY_NAME !== "undefined" && UNIT_BY_NAME[unitName]) || OFFICIAL_UNITS.find(u => u.name === unitName); if (!unit) return;
         let missing = []; let matchCount = 0;
         for (let req of unit.members) {
@@ -1596,10 +1596,10 @@ function updateProgressUI() {
 
     const candidateUnits = [];
     const seenU = Object.create(null);
-    remainingHand.forEach(t => {
-        const list = (typeof UNITS_BY_TILE !== 'undefined' && UNITS_BY_TILE[t]) || [];
-        for (let u = 0; u < list.length; u++) {
-            if (!seenU[list[u].name]) { seenU[list[u].name] = 1; candidateUnits.push(list[u]); }
+    OFFICIAL_UNITS.forEach(unit => {
+        if (unit.members.some(tile => remainingHand.includes(tile)) && !seenU[unit.name]) {
+            seenU[unit.name] = 1;
+            candidateUnits.push(unit);
         }
     });
     candidateUnits.forEach(unit => {
