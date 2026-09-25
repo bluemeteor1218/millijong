@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ミリオン麻雀</title>
     <!-- データと点数計算ロジックの読み込み -->
-    <script src="data.js"></script>
-    <script src="score.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
+    <script src="data.js" defer></script>
+    <script src="score.js" defer></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js" defer></script>
+    <script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js" defer></script>
     <style>
         /* =========================================
            レスポンシブ用 変数定義（縦画面・横画面での最適化）
@@ -314,7 +314,7 @@
                 </select><br>
                 <button class="btn" style="width: 100%;" onclick="createRoom()">ホストになる</button>
                 <p style="font-size: 14px; margin: 8px 0;">部屋番号: <strong id="my-id" style="font-size: 1.2em; color: #e66699;">未作成</strong> <button type="button" class="btn" id="copy-room-btn" onclick="copyRoomId()">コピー</button></p>
-                <p style="font-size: 14px; margin: 8px 0;">参加者: <span id="player-count">0</span> / 4 人</p>
+                <p style="font-size: 14px; margin: 8px 0;">参加者: <span id="player-count">0</span> / 4人</p>
                 <p id="conn-status"></p>
                 <button class="btn" onclick="initMatch()" id="start-btn" style="display:none; background:#4caf50; width: 100%;">試合開始 (不足分はCPU)</button>
                 <hr>
@@ -391,7 +391,7 @@
     <div id="wait-overlay">
         <div class="wait-card">
             <h2 style="margin-top:0;color:#e66699;">接続中</h2>
-            <p id="wait-overlay-msg">ホストの試合開始を待っています...</p>
+            <p id="wait-overlay-msg">ホストの試合開始を待っています・・・</p>
             <button class="btn" onclick="location.reload()">タイトルへ戻る</button>
         </div>
     </div>
@@ -413,7 +413,7 @@
         <button class="btn" id="btn-endmatch" style="display:none; margin-top: 30px; background: #fff; color: #333;" onclick="location.reload();">タイトルへ戻る</button>
     </div>
 
-<script src="game.js"></script>
+<script src="game.js" defer></script>
 
 </body>
 </html>

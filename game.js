@@ -1,20 +1,23 @@
-// 画像プリロード
 const preloadedImages = [];
-window.addEventListener('load', () => {
+let _imagesPreloaded = false;
+function preloadIdolImages() {
+    if (_imagesPreloaded) return;
     if (typeof ALL_TILE_TYPES === 'undefined') return;
-    const types = ALL_TILE_TYPES;
+    _imagesPreloaded = true;
+    const types = ALL_TILE_TYPES.slice();
     let i = 0;
     function pump() {
-        const end = Math.min(i + 8, types.length);
+        const end = Math.min(i + 12, types.length);
         for (; i < end; i++) {
             const img = new Image();
+            img.decoding = 'async';
             img.src = `idol_images/${types[i]}.png`;
             preloadedImages.push(img);
         }
-        if (i < types.length) setTimeout(pump, 40);
+        if (i < types.length) requestAnimationFrame(pump);
     }
     pump();
-});
+}
 
 // モバイル用サイドバー切り替え
 function toggleSidebar() {
@@ -843,6 +846,7 @@ function shuffleSeats(arr) {
 }
 
 function initMatch() {
+    preloadIdolImages();
     gameRuleMaxRounds = parseInt(document.getElementById('game-rule').value);
     currentBakaze = 0; currentKyoku = 1; currentDealer = 0; playerScores = [25000, 25000, 25000, 25000];
     riichiSticks = 0;
@@ -1412,8 +1416,10 @@ function createTileElement(tileText, isHand = false, onClick = null) {
     else if(tileText === 'P（ｼﾞｮｰｶｰ）') displayText = 'P';
     
     const img = document.createElement('img');
-    img.src = `idol_images/${tileText}.png`;
+    img.loading = 'lazy';
+    img.decoding = 'async';
     img.alt = displayText;
+    img.src = `idol_images/${tileText}.png`;
     
     img.onerror = function() {
         this.style.display = 'none';
@@ -1467,8 +1473,10 @@ function scheduleProgressUI() {
     clearTimeout(_progressTimer);
     _progressTimer = setTimeout(() => {
         _progressKey = key;
-        updateProgressUI();
-    }, 220);
+        const run = () => updateProgressUI();
+        if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 800 });
+        else run();
+    }, 480);
 }
 
 function updateProgressUI() {
@@ -1480,7 +1488,7 @@ function updateProgressUI() {
         if(discards[i]) visibleTiles.push(...discards[i]);
     }
 
-    let tenpaiInfo = getTenpaiInfo(myLocalHand, globalOpenTiles[myId] || [], false, myId, true);
+    let tenpaiInfo = [];
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
         tenpaiDiv.style.marginBottom = '15px';
@@ -1584,7 +1592,15 @@ function updateProgressUI() {
     let remainingHand = [];
     for (let i = 0; i < tempHand.length; i++) { if (!consumedIndices.has(i)) remainingHand.push(tempHand[i]); }
 
-    OFFICIAL_UNITS.forEach(unit => {
+    const candidateUnits = [];
+    const seenU = Object.create(null);
+    remainingHand.forEach(t => {
+        const list = (typeof UNITS_BY_TILE !== 'undefined' && UNITS_BY_TILE[t]) || [];
+        for (let u = 0; u < list.length; u++) {
+            if (!seenU[list[u].name]) { seenU[list[u].name] = 1; candidateUnits.push(list[u]); }
+        }
+    });
+    candidateUnits.forEach(unit => {
         if (lockedUnits.has(unit.name)) return; 
         
         let tempHandCopy = [...remainingHand];
@@ -1748,6 +1764,7 @@ function handleHostMsg(data) {
     }
 
     if(data.type === 'START_KYOKU') {
+        preloadIdolImages();
         hideWaitOverlay();
         const dov = document.getElementById('disconnect-overlay');
         if (dov) dov.style.display = 'none';
