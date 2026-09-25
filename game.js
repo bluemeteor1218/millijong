@@ -35,7 +35,7 @@ function layoutTable() {
     if (!board || !center || !app || app.style.display === 'none') return;
     if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
     const br = board.getBoundingClientRect();
-    const tilt = br.height < 420 ? '38deg' : (br.height < 560 ? '42deg' : '44deg');
+    const tilt = br.height < 420 ? '24deg' : (br.height < 560 ? '26deg' : '28deg');
     document.documentElement.style.setProperty('--table-tilt', tilt);
 }
 
@@ -1434,6 +1434,8 @@ function renderOtherHands() {
     for (let i = 1; i <= 3; i++) {
         const absId = (myId + i) % 4; 
         const div = document.getElementById(`hand-${i}`); div.innerHTML = '';
+        const meldDiv = document.getElementById(`melds-${i}`);
+        if (meldDiv) meldDiv.innerHTML = '';
         
         const closedCount = globalHandLens[absId] || 0; 
         const openArr = globalOpenTiles[absId] || [];
@@ -1441,12 +1443,11 @@ function renderOtherHands() {
         for (let j = 0; j < closedCount; j++) { 
             const tile = document.createElement('div'); tile.className = 'mahjong-tile facedown'; div.appendChild(tile); 
         }
-        if (openArr.length > 0) {
-            const spacer = document.createElement('div');
-            spacer.style.width = '15px'; spacer.style.height = '15px';
-            div.appendChild(spacer);
+        if (meldDiv && openArr.length > 0) {
             for (let j = 0; j < openArr.length; j++) {
-                const tile = createTileElement(openArr[j]); tile.classList.add('open-tile'); div.appendChild(tile);
+                const tile = createTileElement(openArr[j]);
+                tile.classList.add('open-tile');
+                meldDiv.appendChild(tile);
             }
         }
     }
