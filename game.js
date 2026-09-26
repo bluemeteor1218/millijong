@@ -1918,6 +1918,7 @@ function prepareNextKyoku(renchan) {
 let resultStage = 'details';
 function resetResultStage() {
     resultStage = 'details';
+    document.getElementById('result-overlay').classList.remove('win-result');
     document.getElementById('result-hand').style.display = '';
     document.getElementById('result-yaku').style.display = '';
     document.getElementById('result-score-text').style.display = '';
@@ -3005,7 +3006,7 @@ function handleHostMsg(data) {
         } else {
             showCutin(data.isTsumo ? 'ツモ！' : 'ロン！', data.isTsumo ? '#4aa9e6' : '#ff0055');
             setTimeout(() => {
-                document.getElementById('result-winner').innerText = '点数移動';
+                document.getElementById('result-winner').innerText = '和了結果';
                 
                 const resultHandDiv = document.getElementById('result-hand'); 
                 resultHandDiv.innerHTML = '';
@@ -3038,7 +3039,9 @@ function handleHostMsg(data) {
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
                 document.getElementById('btn-next-kyoku').innerText = '次へ進む';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
-                document.getElementById('result-overlay').style.display = 'flex';
+                const resultOverlay = document.getElementById('result-overlay');
+                resultOverlay.classList.add('win-result');
+                resultOverlay.style.display = 'flex';
             }, 1200);
         }
     }
