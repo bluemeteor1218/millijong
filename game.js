@@ -597,12 +597,36 @@ function layoutTable() {
 }
 
 let useAlmForProgress = true;
+let useAlmightyForNaki = true;
+let autoWinEnabled = false;
+let pendingAutoWinAction = null;
 function toggleAlmighty() {
     useAlmForProgress = !useAlmForProgress;
     const button = document.getElementById('btn-toggle-alm');
     button.innerText = useAlmForProgress ? 'ALM牌で予測: ON' : 'ALM牌で予測: OFF';
     button.style.background = useAlmForProgress ? '#4caf50' : '#9e9e9e';
     updateProgressUI();
+}
+
+function toggleNakiAlmighty() {
+    useAlmightyForNaki = !useAlmightyForNaki;
+    const button = document.getElementById('btn-toggle-naki-alm');
+    button.innerText = `鳴きでALM牌使用: ${useAlmightyForNaki ? 'ON' : 'OFF'}`;
+    button.style.background = useAlmightyForNaki ? '#4caf50' : '#9e9e9e';
+    button.setAttribute('aria-pressed', String(useAlmightyForNaki));
+}
+
+function toggleAutoWin() {
+    autoWinEnabled = !autoWinEnabled;
+    const button = document.getElementById('btn-auto-win');
+    button.innerText = `自動和了: ${autoWinEnabled ? 'ON' : 'OFF'}`;
+    button.style.background = autoWinEnabled ? '#4caf50' : '#9e9e9e';
+    button.setAttribute('aria-pressed', String(autoWinEnabled));
+    if (autoWinEnabled && pendingAutoWinAction && document.getElementById('action-bar').style.display !== 'none') {
+        const action = pendingAutoWinAction;
+        sendAction(action);
+        hideActions();
+    }
 }
 
 function logM(msg) {
@@ -890,7 +914,11 @@ function unitsPossiblyUsing(tile) {
     return (_unitsByTile && _unitsByTile[tile]) || [];
 }
 
-function checkCanNaki(unlockedHand, tile) {
+function isAlmightyTile(tile) {
+    return tile === 'P（ｼﾞｮｰｶｰ）' || tile.includes('ｵｰﾙﾏｲﾃｨ');
+}
+
+function checkCanNaki(unlockedHand, tile, allowHandAlmighty = true) {
     let nakiUnits = [];
     const unitList = unitsPossiblyUsing(tile);
     for (let unit of unitList) {
@@ -908,7 +936,10 @@ function checkCanNaki(unlockedHand, tile) {
                 if (canSubstitute) {
                     let remainingReqs = [...unit.members];
                     remainingReqs.splice(i, 1);
-                    if (tryExtract(unlockedHand, remainingReqs)) {
+                    const handForNaki = allowHandAlmighty
+                        ? unlockedHand
+                        : unlockedHand.filter(handTile => !isAlmightyTile(handTile));
+                    if (tryExtract(handForNaki, remainingReqs)) {
                         canNakiThisUnit = true;
                         break;
                     }
@@ -927,7 +958,7 @@ function tryExtract(hand, required) {
     return ways.length ? ways[0] : null;
 }
 
-function consumeUnitFromHand(hand, unitName, discardedTile) {
+function consumeUnitFromHand(hand, unitName, discardedTile, allowHandAlmighty = true) {
     let unit = (typeof UNIT_BY_NAME !== "undefined" && UNIT_BY_NAME[unitName]) || OFFICIAL_UNITS.find(u => u.name === unitName);
     let reqs = [...unit.members];
     let usedTiles = [discardedTile];
@@ -955,7 +986,7 @@ function consumeUnitFromHand(hand, unitName, discardedTile) {
         else { missing.push(req); }
     }
     
-    for (let req of missing) {
+    for (let req of allowHandAlmighty ? missing : []) {
         let attrAlm = IDOLS.Princess.includes(req) ? "Prｵｰﾙﾏｲﾃｨ" : (IDOLS.Fairy.includes(req) ? "Faｵｰﾙﾏｲﾃｨ" : "Anｵｰﾙﾏｲﾃｨ");
         let idx = hand.indexOf(attrAlm);
         if (idx !== -1) { usedTiles.push(hand.splice(idx, 1)[0]); continue; }
@@ -1276,9 +1307,9 @@ function getCpuDiscard(hand, pIdx = 0) {
     return candidates[Math.floor(Math.random() * candidates.length)].tile;
 }
 
-function simulateNaki(pIdx, tile, unitName) {
+function simulateNaki(pIdx, tile, unitName, allowHandAlmighty = true) {
     const hand = playerHands[pIdx].slice();
-    const used = consumeUnitFromHand(hand, unitName, tile);
+    const used = consumeUnitFromHand(hand, unitName, tile, allowHandAlmighty);
     return {
         closedLeft: hand.length,
         hand,
@@ -1286,8 +1317,8 @@ function simulateNaki(pIdx, tile, unitName) {
     };
 }
 
-function canNakiWithDiscardLeft(pIdx, tile, unitName) {
-    return simulateNaki(pIdx, tile, unitName).closedLeft >= 1;
+function canNakiWithDiscardLeft(pIdx, tile, unitName, allowHandAlmighty = true) {
+    return simulateNaki(pIdx, tile, unitName, allowHandAlmighty).closedLeft >= 1;
 }
 
 function getCpuNakiChoice(pIdx, tile) {
@@ -1660,11 +1691,16 @@ function processNakiAction(pIdx, action, payload=null, spentExtraSeconds = 0) {
         if (!evalRon || isFuriten(pIdx)) action = 'SKIP';
     }
     if (action === 'NAKI') {
-        if (playerRiichi[pIdx] || !payload) action = 'SKIP';
+        const unitName = typeof payload === 'string' ? payload : payload && payload.unitName;
+        const allowHandAlmighty = payload && typeof payload.allowHandAlmighty === 'boolean'
+            ? payload.allowHandAlmighty
+            : true;
+        if (playerRiichi[pIdx] || !unitName) action = 'SKIP';
         else {
-            const can = checkCanNaki(playerHands[pIdx], currentDiscard.tile);
-            if (!can || !can.includes(payload)) action = 'SKIP';
-            else if (!canNakiWithDiscardLeft(pIdx, currentDiscard.tile, payload)) action = 'SKIP';
+            const can = checkCanNaki(playerHands[pIdx], currentDiscard.tile, allowHandAlmighty);
+            if (!can || !can.includes(unitName)) action = 'SKIP';
+            else if (!canNakiWithDiscardLeft(pIdx, currentDiscard.tile, unitName, allowHandAlmighty)) action = 'SKIP';
+            else payload = { unitName, allowHandAlmighty };
         }
     }
     if (action === 'SKIP') {
@@ -1730,11 +1766,15 @@ function resolveActions() {
     if (nakis.length > 0) {
         let applied = false;
         for (const naki of nakis) {
-            let nPlayer = naki.pIdx; let nUnit = naki.payload;
+            let nPlayer = naki.pIdx;
+            const nUnit = typeof naki.payload === 'string' ? naki.payload : naki.payload.unitName;
+            const allowHandAlmighty = typeof naki.payload === 'object' && naki.payload !== null
+                ? naki.payload.allowHandAlmighty !== false
+                : true;
             if (playerRiichi[nPlayer]) continue;
-            const can = checkCanNaki(playerHands[nPlayer], currentDiscard.tile);
+            const can = checkCanNaki(playerHands[nPlayer], currentDiscard.tile, allowHandAlmighty);
             if (!can || !can.includes(nUnit)) continue;
-            if (!canNakiWithDiscardLeft(nPlayer, currentDiscard.tile, nUnit)) continue;
+            if (!canNakiWithDiscardLeft(nPlayer, currentDiscard.tile, nUnit, allowHandAlmighty)) continue;
 
             if (clerkState.active && !clerkState.interruptedByNaki && currentDiscard.pIdx === clerkState.originalPlayer) {
                 if (clerkState.discardsLeft === 1) clerkState.firstNakiPlayer = nPlayer;
@@ -1742,7 +1782,7 @@ function resolveActions() {
                 clerkState.interruptedByNaki = true;
             }
 
-            let usedTiles = consumeUnitFromHand(playerHands[nPlayer], nUnit, currentDiscard.tile);
+            let usedTiles = consumeUnitFromHand(playerHands[nPlayer], nUnit, currentDiscard.tile, allowHandAlmighty);
             openTiles[nPlayer].push(...usedTiles);
             openUnitNames[nPlayer].push(nUnit);
             discards[currentDiscard.pIdx].pop();
@@ -2075,7 +2115,7 @@ function highlightNakiUnit(unitName, discardedTile) {
     const tiles = document.querySelectorAll('#my-hand-area .mahjong-tile');
     if (!unitName) { tiles.forEach(el => el.classList.remove('hover-highlight')); return; }
     
-    let usedTiles = consumeUnitFromHand([...myLocalHand], unitName, discardedTile);
+    let usedTiles = consumeUnitFromHand([...myLocalHand], unitName, discardedTile, useAlmightyForNaki);
     let highlightIndices = new Set();
     let tempHand = [...myLocalHand];
     
@@ -2733,6 +2773,12 @@ function handleHostMsg(data) {
             let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], true, isDealer, myId);
             
             if (scoreInfo.han > 0) {
+                pendingAutoWinAction = 'TSUMO';
+                if (autoWinEnabled) {
+                    sendAction('TSUMO');
+                    hideActions();
+                    return;
+                }
                 document.getElementById('action-bar').style.display = 'flex'; 
                 showActionPrompt('ツモできます');
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
@@ -2831,9 +2877,15 @@ function handleHostMsg(data) {
             }
             if (canRon && clientIsFuriten()) canRon = false;
             lastAskCouldRon = canRon;
+            pendingAutoWinAction = canRon ? 'RON' : null;
+            if (canRon && autoWinEnabled) {
+                sendAction('RON');
+                hideActions();
+                return;
+            }
             
             let unlocked = getUnlockedHand();
-            let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile);
+            let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile, useAlmightyForNaki);
 
             if (canRon || nakiUnits) {
                 document.getElementById('action-bar').style.display = 'flex';
@@ -2858,7 +2910,10 @@ function handleHostMsg(data) {
                         btn.style.background = '#ff9800';
                         btn.style.marginRight = '5px';
                         btn.innerText = `${u}でスカウト`;
-                        btn.onclick = () => { sendAction('NAKI', u); hideActions(); };
+                        btn.onclick = () => {
+                            sendAction('NAKI', { unitName: u, allowHandAlmighty: useAlmightyForNaki });
+                            hideActions();
+                        };
                         btn.onmouseenter = () => highlightNakiUnit(u, data.tile);
                         btn.onmouseleave = () => highlightUnit(null);
                         nakiContainer.appendChild(btn);
@@ -2889,6 +2944,12 @@ function handleHostMsg(data) {
             let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], null, isClosed, globalPlayerRiichi[myId], false, isDealer, myId);
             
             if (scoreInfo.han > 0) {
+                pendingAutoWinAction = 'TSUMO';
+                if (autoWinEnabled) {
+                    sendAction('TSUMO');
+                    hideActions();
+                    return;
+                }
                 document.getElementById('action-bar').style.display = 'flex'; 
                 showActionPrompt('ツモできます');
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
@@ -3073,6 +3134,7 @@ function renderHand(isMyTurn) {
 }
 
 function hideActions() { 
+    pendingAutoWinAction = null;
     clearInterval(actionTimerInterval); 
     document.getElementById('action-budget').innerText = '';
     document.getElementById('action-budget').style.visibility = 'hidden';
