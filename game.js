@@ -1953,6 +1953,74 @@ function reorderLockedTilesToLeft() {
 
 function sortMyHand() { myLocalHand.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999)); reorderLockedTilesToLeft(); renderHand(isMyTurnNow); }
 
+const idolImageStates = new Map();
+const idolImageQueue = [];
+let activeIdolImageLoads = 0;
+const MAX_IDOL_IMAGE_LOADS = 4;
+
+function revealTileImage(image, fallback, src) {
+    image.onload = () => {
+        const reveal = () => {
+            image.style.visibility = 'visible';
+            fallback.style.display = 'none';
+        };
+        if (typeof image.decode === 'function') image.decode().then(reveal).catch(() => { image.style.display = 'none'; });
+        else reveal();
+    };
+    image.onerror = () => { image.style.display = 'none'; fallback.style.display = ''; };
+    image.style.display = '';
+    image.src = src;
+    if (image.complete && image.naturalWidth > 0) image.onload();
+}
+
+function pumpIdolImageQueue() {
+    while (activeIdolImageLoads < MAX_IDOL_IMAGE_LOADS && idolImageQueue.length) {
+        const state = idolImageQueue.shift();
+        if (state.status !== 'queued') continue;
+        state.status = 'loading';
+        activeIdolImageLoads++;
+        const loader = new Image();
+        loader.decoding = 'async';
+        let settled = false;
+        const finish = success => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(state.timeout);
+            state.status = success ? 'loaded' : 'failed';
+            state.src = success ? loader.src : '';
+            activeIdolImageLoads--;
+            state.listeners.splice(0).forEach(({ image, fallback }) => {
+                if (success) revealTileImage(image, fallback, state.src);
+                else if (!success) { image.style.display = 'none'; fallback.style.display = ''; }
+            });
+            pumpIdolImageQueue();
+        };
+        loader.onload = () => {
+            if (typeof loader.decode === 'function') loader.decode().then(() => finish(true)).catch(() => finish(false));
+            else finish(true);
+        };
+        loader.onerror = () => finish(false);
+        state.timeout = setTimeout(() => finish(false), 10000);
+        loader.src = state.srcPath;
+    }
+}
+
+function requestIdolImage(image, fallback, tileName) {
+    let state = idolImageStates.get(tileName);
+    if (state && state.status === 'loaded') {
+        revealTileImage(image, fallback, state.src);
+        return;
+    }
+    if (state && state.status === 'failed') return;
+    if (!state) {
+        state = { status: 'queued', srcPath: `idol_images/${encodeURIComponent(tileName)}.png`, src: '', listeners: [] };
+        idolImageStates.set(tileName, state);
+        idolImageQueue.push(state);
+    }
+    state.listeners.push({ image, fallback });
+    pumpIdolImageQueue();
+}
+
 function createTileElement(tileText, isHand = false, onClick = null) {
     const div = document.createElement('div'); div.className = 'mahjong-tile';
     if(!tileText) return div;
@@ -1974,17 +2042,11 @@ function createTileElement(tileText, isHand = false, onClick = null) {
     const hasTileImage = IDOLS.Princess.includes(tileText) || IDOLS.Fairy.includes(tileText) || IDOLS.Angel.includes(tileText);
     if (hasTileImage) {
         const img = document.createElement('img');
-        img.loading = 'eager';
         img.decoding = 'async';
         img.alt = '';
         img.style.visibility = 'hidden';
-        img.onload = () => {
-            img.style.visibility = 'visible';
-            fallback.style.display = 'none';
-        };
-        img.onerror = () => { img.style.display = 'none'; };
-        img.src = `idol_images/${encodeURIComponent(tileText)}.png`;
         div.appendChild(img);
+        requestIdolImage(img, fallback, tileText);
     }
 
     if(onClick) { div.onclick = onClick; div.style.cursor = 'pointer'; }
