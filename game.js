@@ -6,6 +6,7 @@ function toggleSidebar() {
     overlay.classList.toggle('open');
 }
 
+/*
 let _actionBudgetMeasureContext = null;
 function layoutActionBudget() {
     const row = document.getElementById('player-hand-row');
@@ -23,20 +24,6 @@ function layoutActionBudget() {
     const gap = parseFloat(rowStyle.columnGap) || 0;
     const buttonWidth = sortButton.getBoundingClientRect().width;
     const preferredBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
-    if (!_actionBudgetMeasureContext) {
-        _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
-    }
-    if (!_actionBudgetMeasureContext) return;
-    const initialBudgetStyle = getComputedStyle(budget);
-    const horizontalChrome = parseFloat(initialBudgetStyle.paddingLeft) + parseFloat(initialBudgetStyle.paddingRight)
-        + parseFloat(initialBudgetStyle.borderLeftWidth) + parseFloat(initialBudgetStyle.borderRightWidth);
-    const longestTimeText = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0
-        ? '0秒＋10秒'
-        : `${roomTimerSettings.basicSeconds}秒＋${roomTimerSettings.poolSeconds}秒`;
-    const availableScreenHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    const targetFontSize = Math.min(32, Math.max(18, Math.min(rowWidth * 0.05, availableScreenHeight * 0.08)));
-    _actionBudgetMeasureContext.font = `800 ${targetFontSize}px ${initialBudgetStyle.fontFamily}`;
-    const minimumFontBox = Math.ceil(_actionBudgetMeasureContext.measureText(longestTimeText).width + horizontalChrome);
     let budgetWidth = preferredBudgetWidth;
     budget.style.width = `${budgetWidth}px`;
     const scrollWidth = Math.max(0, rowWidth - buttonWidth - budgetWidth - gap * 2);
@@ -91,27 +78,253 @@ function layoutActionBudget() {
         budgetLeft = rowRect.right - budgetWidth;
     }
     root.style.setProperty('--hand-tile-w', `${tileWidth}px`);
-    root.style.setProperty('--hand-tile-h', `${tileWidth * 1.4}px`);
-    root.style.setProperty('--concealed-hand-width', `${concealedHandWidth}px`);
     root.style.setProperty('--tile-depth', `${Math.max(3, Math.min(6, tileWidth * 0.12))}px`);
+                const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+                const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+                scroll.style.width = `${Math.max(0, rowWidth - buttonWidth - budgetWidth - gap * 2)}px`;
+                scroll.style.flexBasis = scroll.style.width;
 
-    scrollRect = scroll.getBoundingClientRect();
-    const targetFirstTileLeft = ((playLeft + budgetLeft) / 2) - (concealedHandWidth / 2);
-    hand.style.marginLeft = `${Math.max(0, targetFirstTileLeft - scrollRect.left - marginLeft)}px`;
+}
 
-    budget.style.left = `${budgetLeft - dockRect.left}px`;
-    budget.style.right = 'auto';
+                const boardLeft = gameBoard.getBoundingClientRect().left;
+                const budgetLeft = rowRect.right - budgetWidth;
+let _tableResizeObserver = null;
+function layoutTable() {
+        return;
+    }
+    _layoutLock = true;
+                const tileWidth = parseFloat(getComputedStyle(root).getPropertyValue('--hand-tile-base-w'))
+        _layoutLock = false;
+        if (_layoutPending) {
+            let _actionBudgetMeasureContext = null;
+            function layoutActionBudget() {
+                const row = document.getElementById('player-hand-row');
+                const sortButton = document.getElementById('btn-sort-hand');
+                const scroll = document.getElementById('player-hand-scroll');
+                const hand = document.getElementById('my-hand-area');
+                const budget = document.getElementById('action-budget');
+                const dock = document.getElementById('player-dock');
+                const gameBoard = document.getElementById('game-board');
+                if (!row || !sortButton || !scroll || !hand || !budget || !dock || !gameBoard) return;
+
+                const rowWidth = row.clientWidth;
+                if (rowWidth < 1) return;
+                const rowGap = parseFloat(getComputedStyle(row).columnGap) || 0;
+                const buttonWidth = sortButton.getBoundingClientRect().width;
+                const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+                budget.style.width = `${budgetWidth}px`;
+                const scrollWidth = Math.max(0, rowWidth - buttonWidth - budgetWidth - (rowGap * 2));
+                scroll.style.width = `${scrollWidth}px`;
+                scroll.style.flexBasis = `${scrollWidth}px`;
+
+                const rowRect = row.getBoundingClientRect();
+                const dockRect = dock.getBoundingClientRect();
+                budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
+                budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
+
+                const timerRect = budget.getBoundingClientRect();
+                const baseTileWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-tile-base-w'))
+                    || parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-tile-w')) || 30;
+                const tile = hand.querySelector('.mahjong-tile');
+                const tileStyle = tile ? getComputedStyle(tile) : null;
+                const tileMarginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
+                const tileHorizontalMargins = tileStyle
+                    ? tileMarginLeft + (parseFloat(tileStyle.marginRight) || 0)
+                    : 4;
+                const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+                const concealedHandWidth = 13 * (baseTileWidth + tileHorizontalMargins) + 12 * handGap;
+                const boardLeft = gameBoard.getBoundingClientRect().left;
+                const scrollRect = scroll.getBoundingClientRect();
+                const firstTileLeft = ((boardLeft + timerRect.left) / 2) - (concealedHandWidth / 2);
+                hand.style.marginLeft = `${Math.max(0, firstTileLeft - scrollRect.left - tileMarginLeft)}px`;
+
+                if (!_actionBudgetMeasureContext) _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
+                if (!_actionBudgetMeasureContext) return;
+                const budgetStyle = getComputedStyle(budget);
+                const textChrome = parseFloat(budgetStyle.paddingLeft) + parseFloat(budgetStyle.paddingRight)
+                    + parseFloat(budgetStyle.borderLeftWidth) + parseFloat(budgetStyle.borderRightWidth);
+                const availableTextWidth = Math.max(0, budgetWidth - textChrome);
+                const maxTimeLabel = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0
+                    ? '0秒＋10秒'
+                    : `${roomTimerSettings.basicSeconds}秒＋${roomTimerSettings.poolSeconds}秒`;
+                let fontSize = 54;
+                for (; fontSize > 10; fontSize--) {
+                    _actionBudgetMeasureContext.font = `800 ${fontSize}px ${budgetStyle.fontFamily}`;
+                    if (_actionBudgetMeasureContext.measureText(maxTimeLabel).width <= availableTextWidth) break;
+                }
+                budget.style.fontSize = `${fontSize}px`;
+            }
+
+            let _layoutLock = false;
+            let _layoutPending = false;
+            let _tableResizeObserver = null;
+            function layoutTable() {
+                if (_layoutLock) {
+                    _layoutPending = true;
+                    return;
+                }
+                _layoutLock = true;
+                requestAnimationFrame(() => {
+                    _layoutLock = false;
+                    if (_layoutPending) {
+                        _layoutPending = false;
+                        layoutTable();
+                    }
+                });
+
+                const board = document.getElementById('table-area') || document.getElementById('game-board');
+                const app = document.getElementById('app-container');
+                if (!board || !app || app.style.display === 'none') return;
+                if (!_tableResizeObserver && typeof ResizeObserver !== 'undefined') {
+                    _tableResizeObserver = new ResizeObserver(() => layoutTable());
+                    _tableResizeObserver.observe(board);
+                }
+
+                const { width, height } = board.getBoundingClientRect();
+                if (width < 40 || height < 40) return;
+                const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+                const root = document.documentElement;
+                const isPortrait = height > width;
+                const isCompactLandscape = !isPortrait && height < 480;
+                const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
+                const handHeight = clamp(handWidth * 1.4, 34, 64);
+                const riverLength = isPortrait ? height : width;
+                const riverWidth = clamp(Math.min(width * 0.073, height * 0.07, (riverLength - 34) / 18), 12, 48);
+                const riverHeight = riverWidth * 1.4;
+                const otherWidth = clamp(riverWidth * 0.86, 17, 40);
+                const otherHeight = otherWidth * 1.4;
+                const centerScale = clamp(Math.min(width / 440, height / 600), 0.62, 0.86);
+                const tilt = height < 420 ? 22 : height < 560 ? 25 : 28;
+
+                root.style.setProperty('--hand-tile-w', `${handWidth}px`);
+                root.style.setProperty('--hand-tile-base-w', `${handWidth}px`);
+                root.style.setProperty('--hand-tile-h', `${handHeight}px`);
+                root.style.setProperty('--concealed-hand-width', `${13 * (handWidth + 4) + 24}px`);
+                root.style.setProperty('--river-tile-w', `${riverWidth}px`);
+                root.style.setProperty('--river-tile-h', `${riverHeight}px`);
+                root.style.setProperty('--other-tile-w', `${otherWidth}px`);
+                root.style.setProperty('--other-tile-h', `${otherHeight}px`);
+                root.style.setProperty('--tile-depth', `${clamp(handWidth * 0.12, 3, 6)}px`);
+                root.style.setProperty('--center-scale', centerScale);
+                root.style.setProperty('--table-tilt', `${tilt}deg`);
+
+                const rivers = [0, 1, 2, 3].map(index => document.getElementById(`river-${index}`));
+                rivers.forEach((river, index) => {
+                    if (!river) return;
+                    const isLongRow = isPortrait ? index === 1 || index === 3 : isCompactLandscape && (index === 0 || index === 2);
+                    const columns = isLongRow ? 18 : 6;
+                    const rows = isLongRow ? 1 : 3;
+                    river.style.width = `${columns * riverWidth + (columns - 1) * 2}px`;
+                    river.style.gridTemplateColumns = `repeat(${columns}, ${riverWidth}px)`;
+                    river.style.gridTemplateRows = `repeat(${rows}, ${riverHeight}px)`;
+                    river.style.gridAutoRows = `${riverHeight}px`;
+                });
+
+                const [bottomRiver, rightRiver, topRiver, leftRiver] = rivers;
+                if (isPortrait) {
+                    rightRiver.style.left = '76%';
+                    leftRiver.style.left = '24%';
+                    bottomRiver.style.top = '68%';
+                    bottomRiver.style.left = '50%';
+                    bottomRiver.style.direction = 'ltr';
+                    topRiver.style.top = '13%';
+                    topRiver.style.left = '50%';
+                    topRiver.style.direction = 'ltr';
+                } else if (isCompactLandscape) {
+                    rightRiver.style.left = '73%';
+                    leftRiver.style.left = '27%';
+                    bottomRiver.style.top = '78%';
+                    bottomRiver.style.left = '45%';
+                    bottomRiver.style.direction = 'rtl';
+                    topRiver.style.top = '17%';
+                    topRiver.style.left = '47%';
+                    topRiver.style.direction = 'ltr';
+                } else {
+                    rightRiver.style.left = '73%';
+                    leftRiver.style.left = '27%';
+                    bottomRiver.style.top = '68%';
+                    bottomRiver.style.left = '50%';
+                    bottomRiver.style.direction = 'ltr';
+                    topRiver.style.top = '13%';
+                    topRiver.style.left = '50%';
+                    topRiver.style.direction = 'ltr';
+                }
+
+                const rightSeat = document.getElementById('seat-1');
+                const topSeat = document.getElementById('seat-2');
+                const leftSeat = document.getElementById('seat-3');
+                if (rightSeat) rightSeat.style.left = isPortrait ? '88%' : '87%';
+                if (topSeat) topSeat.style.top = isCompactLandscape ? '3%' : '6%';
+                if (leftSeat) leftSeat.style.left = isPortrait ? '12%' : '13%';
+                layoutActionBudget();
+            }
+
+            let useAlmForProgress = true;
+    if (tile === req) return true;
+    if (tile === "P（ｼﾞｮｰｶｰ）") return true;
+    const alm = attrAlmightyFor(req);
+    return !!(alm && tile === alm);
+}
+
+// ワイルドカードの割り当て違いを含む抽出（残り手牌のユニークな形だけ返す）
+*/
+let _actionBudgetMeasureContext = null;
+function layoutActionBudget() {
+    const row = document.getElementById('player-hand-row');
+    const sortButton = document.getElementById('btn-sort-hand');
+    const scroll = document.getElementById('player-hand-scroll');
+    const hand = document.getElementById('my-hand-area');
+    const budget = document.getElementById('action-budget');
+    const dock = document.getElementById('player-dock');
+    const gameBoard = document.getElementById('game-board');
+    if (!row || !sortButton || !scroll || !hand || !budget || !dock || !gameBoard) return;
+
+    const rowWidth = row.clientWidth;
+    if (rowWidth < 1) return;
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    const buttonWidth = sortButton.getBoundingClientRect().width;
+    const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+    const scrollWidth = Math.max(0, rowWidth - buttonWidth - budgetWidth - gap * 2);
+    scroll.style.width = `${scrollWidth}px`;
+    scroll.style.flexBasis = `${scrollWidth}px`;
+
+    const rowRect = row.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
     budget.style.width = `${budgetWidth}px`;
-    const finalScrollWidth = Math.max(0, budgetLeft - scrollRect.left - gap);
-    scroll.style.width = `${finalScrollWidth}px`;
-    scroll.style.flexBasis = `${finalScrollWidth}px`;
+    budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
+    budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
 
+    const tile = hand.querySelector('.mahjong-tile');
+    const tileStyle = tile ? getComputedStyle(tile) : null;
+    const root = document.documentElement;
+    const tileWidth = parseFloat(getComputedStyle(root).getPropertyValue('--hand-tile-base-w'))
+        || parseFloat(getComputedStyle(root).getPropertyValue('--hand-tile-w')) || 30;
+    const marginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
+    const horizontalMargins = tileStyle
+        ? marginLeft + (parseFloat(tileStyle.marginRight) || 0)
+        : 4;
+    const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+    const concealedHandWidth = 13 * (tileWidth + horizontalMargins) + 12 * handGap;
+    root.style.setProperty('--concealed-hand-width', `${concealedHandWidth}px`);
+    const scrollRect = scroll.getBoundingClientRect();
+    const timerRect = budget.getBoundingClientRect();
+    const boardLeft = gameBoard.getBoundingClientRect().left;
+    const firstTileLeft = ((boardLeft + timerRect.left) / 2) - (concealedHandWidth / 2);
+    hand.style.marginLeft = `${Math.max(0, firstTileLeft - scrollRect.left - marginLeft)}px`;
+
+    if (!_actionBudgetMeasureContext) _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
+    if (!_actionBudgetMeasureContext) return;
     const budgetStyle = getComputedStyle(budget);
+    const horizontalChrome = parseFloat(budgetStyle.paddingLeft) + parseFloat(budgetStyle.paddingRight)
+        + parseFloat(budgetStyle.borderLeftWidth) + parseFloat(budgetStyle.borderRightWidth);
     const availableTextWidth = Math.max(0, budgetWidth - horizontalChrome);
+    const timeLabel = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0
+        ? '0秒＋10秒'
+        : `${roomTimerSettings.basicSeconds}秒＋${roomTimerSettings.poolSeconds}秒`;
     let fontSize = 54;
     for (; fontSize > 10; fontSize--) {
         _actionBudgetMeasureContext.font = `800 ${fontSize}px ${budgetStyle.fontFamily}`;
-        if (_actionBudgetMeasureContext.measureText(longestTimeText).width <= availableTextWidth) break;
+        if (_actionBudgetMeasureContext.measureText(timeLabel).width <= availableTextWidth) break;
     }
     budget.style.fontSize = `${fontSize}px`;
 }
@@ -132,10 +345,10 @@ function layoutTable() {
             layoutTable();
         }
     });
+
     const board = document.getElementById('table-area') || document.getElementById('game-board');
     const app = document.getElementById('app-container');
     if (!board || !app || app.style.display === 'none') return;
-
     if (!_tableResizeObserver && typeof ResizeObserver !== 'undefined') {
         _tableResizeObserver = new ResizeObserver(() => layoutTable());
         _tableResizeObserver.observe(board);
@@ -143,16 +356,12 @@ function layoutTable() {
 
     const { width, height } = board.getBoundingClientRect();
     if (width < 40 || height < 40) return;
-
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const root = document.documentElement;
-    const playerDock = document.getElementById('player-dock');
-    if (playerDock) root.style.setProperty('--player-dock-height', `${playerDock.offsetHeight}px`);
     const isPortrait = height > width;
     const isCompactLandscape = !isPortrait && height < 480;
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
     const handHeight = clamp(handWidth * 1.4, 34, 64);
-    const concealedHandWidth = (13 * (handWidth + 4)) + (12 * 2);
     const riverLength = isPortrait ? height : width;
     const riverWidth = clamp(Math.min(width * 0.073, height * 0.07, (riverLength - 34) / 18), 12, 48);
     const riverHeight = riverWidth * 1.4;
@@ -164,7 +373,7 @@ function layoutTable() {
     root.style.setProperty('--hand-tile-w', `${handWidth}px`);
     root.style.setProperty('--hand-tile-base-w', `${handWidth}px`);
     root.style.setProperty('--hand-tile-h', `${handHeight}px`);
-    root.style.setProperty('--concealed-hand-width', `${concealedHandWidth}px`);
+    root.style.setProperty('--concealed-hand-width', `${13 * (handWidth + 4) + 24}px`);
     root.style.setProperty('--river-tile-w', `${riverWidth}px`);
     root.style.setProperty('--river-tile-h', `${riverHeight}px`);
     root.style.setProperty('--other-tile-w', `${otherWidth}px`);
@@ -187,32 +396,17 @@ function layoutTable() {
 
     const [bottomRiver, rightRiver, topRiver, leftRiver] = rivers;
     if (isPortrait) {
-        rightRiver.style.left = '76%';
-        leftRiver.style.left = '24%';
-        bottomRiver.style.top = '68%';
-        bottomRiver.style.left = '50%';
-        bottomRiver.style.direction = 'ltr';
-        topRiver.style.top = '13%';
-        topRiver.style.left = '50%';
-        topRiver.style.direction = 'ltr';
+        rightRiver.style.left = '76%'; leftRiver.style.left = '24%';
+        bottomRiver.style.top = '68%'; bottomRiver.style.left = '50%'; bottomRiver.style.direction = 'ltr';
+        topRiver.style.top = '13%'; topRiver.style.left = '50%'; topRiver.style.direction = 'ltr';
     } else if (isCompactLandscape) {
-        rightRiver.style.left = '73%';
-        leftRiver.style.left = '27%';
-        bottomRiver.style.top = '78%';
-        bottomRiver.style.left = '45%';
-        bottomRiver.style.direction = 'rtl';
-        topRiver.style.top = '17%';
-        topRiver.style.left = '47%';
-        topRiver.style.direction = 'ltr';
+        rightRiver.style.left = '73%'; leftRiver.style.left = '27%';
+        bottomRiver.style.top = '78%'; bottomRiver.style.left = '45%'; bottomRiver.style.direction = 'rtl';
+        topRiver.style.top = '17%'; topRiver.style.left = '47%'; topRiver.style.direction = 'ltr';
     } else {
-        rightRiver.style.left = '73%';
-        leftRiver.style.left = '27%';
-        bottomRiver.style.top = '68%';
-        bottomRiver.style.left = '50%';
-        bottomRiver.style.direction = 'ltr';
-        topRiver.style.top = '13%';
-        topRiver.style.left = '50%';
-        topRiver.style.direction = 'ltr';
+        rightRiver.style.left = '73%'; leftRiver.style.left = '27%';
+        bottomRiver.style.top = '68%'; bottomRiver.style.left = '50%'; bottomRiver.style.direction = 'ltr';
+        topRiver.style.top = '13%'; topRiver.style.left = '50%'; topRiver.style.direction = 'ltr';
     }
 
     const rightSeat = document.getElementById('seat-1');
@@ -227,36 +421,38 @@ function layoutTable() {
 let useAlmForProgress = true;
 function toggleAlmighty() {
     useAlmForProgress = !useAlmForProgress;
-    let btn = document.getElementById('btn-toggle-alm');
-    if (useAlmForProgress) {
-        btn.innerText = 'ALM牌で予測: ON';
-        btn.style.background = '#4caf50';
-    } else {
-        btn.innerText = 'ALM牌で予測: OFF';
-        btn.style.background = '#9e9e9e';
-    }
+    const button = document.getElementById('btn-toggle-alm');
+    button.innerText = useAlmForProgress ? 'ALM牌で予測: ON' : 'ALM牌で予測: OFF';
+    button.style.background = useAlmForProgress ? '#4caf50' : '#9e9e9e';
     updateProgressUI();
 }
 
 function logM(msg) {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.style.background = 'rgba(0,0,0,0.8)'; toast.style.color = 'white'; toast.style.padding = '8px 16px';
-    toast.style.borderRadius = '20px'; toast.style.fontSize = '14px'; toast.style.transition = 'opacity 0.5s';
+    toast.style.background = 'rgba(0,0,0,0.8)';
+    toast.style.color = 'white';
+    toast.style.padding = '8px 16px';
+    toast.style.borderRadius = '20px';
+    toast.style.fontSize = '14px';
+    toast.style.transition = 'opacity 0.5s';
     toast.innerText = msg;
     container.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 3000);
 }
 
 function showCutin(text, color) {
-    const cutinOverlay = document.getElementById('cutin-overlay'); 
-    const cutinText = document.getElementById('cutin-text');
-    cutinText.innerText = text; 
-    cutinText.style.color = color; 
-    cutinText.style.animation = 'none'; 
-    cutinOverlay.style.display = 'flex';
-    setTimeout(() => { cutinText.style.animation = 'popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'; }, 10);
-    setTimeout(() => { cutinOverlay.style.display = 'none'; }, 1200);
+    const overlay = document.getElementById('cutin-overlay');
+    const label = document.getElementById('cutin-text');
+    label.innerText = text;
+    label.style.color = color;
+    label.style.animation = 'none';
+    overlay.style.display = 'flex';
+    setTimeout(() => { label.style.animation = 'popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards'; }, 10);
+    setTimeout(() => { overlay.style.display = 'none'; }, 1200);
 }
 
 function showActionToast(text, type = 'turn') {
@@ -271,41 +467,37 @@ function showActionToast(text, type = 'turn') {
     }
     toast.style.display = 'block';
     toast.classList.remove('show-action-toast');
-    void toast.offsetWidth; 
+    void toast.offsetWidth;
     toast.classList.add('show-action-toast');
     setTimeout(() => { toast.style.display = 'none'; }, 1500);
 }
 
 function attrAlmightyFor(req) {
-    const attr = (typeof IDOL_ATTR !== 'undefined' && IDOL_ATTR[req]) || (
-        IDOLS.Princess.includes(req) ? 'Pr' : IDOLS.Fairy.includes(req) ? 'Fa' : IDOLS.Angel.includes(req) ? 'An' : null
-    );
-    return attr ? (attr + "ｵｰﾙﾏｲﾃｨ") : null;
+    const attr = IDOL_ATTR[req] || (IDOLS.Princess.includes(req) ? 'Pr' : IDOLS.Fairy.includes(req) ? 'Fa' : IDOLS.Angel.includes(req) ? 'An' : null);
+    return attr ? `${attr}ｵｰﾙﾏｲﾃｨ` : null;
 }
 
 function canPossiblyExtract(hand, required) {
-    const pool = {};
-    for (let i = 0; i < hand.length; i++) pool[hand[i]] = (pool[hand[i]] || 0) + 1;
+    const pool = Object.create(null);
+    hand.forEach(tile => { pool[tile] = (pool[tile] || 0) + 1; });
     let needPr = 0, needFa = 0, needAn = 0;
-    for (let i = 0; i < required.length; i++) {
-        const req = required[i];
+    for (const req of required) {
         if (pool[req] > 0) { pool[req]--; continue; }
-        const attr = (typeof IDOL_ATTR !== 'undefined' && IDOL_ATTR[req]) || null;
+        const attr = IDOL_ATTR[req];
         if (attr === 'Pr') needPr++;
         else if (attr === 'Fa') needFa++;
         else if (attr === 'An') needAn++;
         else return false;
     }
-    const use = (need, key) => {
-        const have = pool[key] || 0;
-        const u = Math.min(need, have);
-        pool[key] = have - u;
-        return need - u;
+    const consume = (need, key) => {
+        const used = Math.min(need, pool[key] || 0);
+        pool[key] = (pool[key] || 0) - used;
+        return need - used;
     };
-    needPr = use(needPr, "Prｵｰﾙﾏｲﾃｨ");
-    needFa = use(needFa, "Faｵｰﾙﾏｲﾃｨ");
-    needAn = use(needAn, "Anｵｰﾙﾏｲﾃｨ");
-    return (needPr + needFa + needAn) <= (pool["P（ｼﾞｮｰｶｰ）"] || 0);
+    needPr = consume(needPr, 'Prｵｰﾙﾏｲﾃｨ');
+    needFa = consume(needFa, 'Faｵｰﾙﾏｲﾃｨ');
+    needAn = consume(needAn, 'Anｵｰﾙﾏｲﾃｨ');
+    return needPr + needFa + needAn <= (pool['P（ｼﾞｮｰｶｰ）'] || 0);
 }
 
 function scoreHand(units, hand, openTiles, agariTile, isClosed, isRiichi, isTsumo, isDealer, pIdx = null) {
@@ -314,13 +506,11 @@ function scoreHand(units, hand, openTiles, agariTile, isClosed, isRiichi, isTsum
 }
 
 function tileFillsReq(tile, req) {
-    if (tile === req) return true;
-    if (tile === "P（ｼﾞｮｰｶｰ）") return true;
-    const alm = attrAlmightyFor(req);
-    return !!(alm && tile === alm);
+    if (tile === req || tile === 'P（ｼﾞｮｰｶｰ）') return true;
+    const almighty = attrAlmightyFor(req);
+    return !!almighty && tile === almighty;
 }
 
-// ワイルドカードの割り当て違いを含む抽出（残り手牌のユニークな形だけ返す）
 function extractAllWays(hand, required) {
     const results = [];
     const seen = new Set();
@@ -1577,8 +1767,6 @@ function advanceResultStage() {
         resultStage = 'transfer';
         document.getElementById('result-hand').style.display = 'none';
         document.getElementById('result-yaku').style.display = 'none';
-        document.getElementById('result-score-text').style.display = 'none';
-        document.getElementById('result-point-transfer').style.display = 'block';
         document.getElementById('btn-next-kyoku').innerText = '次へ進む';
         return;
     }
@@ -1587,20 +1775,15 @@ function advanceResultStage() {
 
 function handleReadyNext() {
     readyForNextKyokuCount++;
-    let humanCount = playerRoles.filter(r => r !== 'CPU').length;
-    if (readyForNextKyokuCount >= humanCount) {
-        proceedToNextKyoku();
-    }
+    const humanCount = playerRoles.filter(role => role !== 'CPU').length;
+    if (readyForNextKyokuCount >= humanCount) proceedToNextKyoku();
 }
 
 function sendReadyNext() {
     document.getElementById('btn-next-kyoku').style.display = 'none';
     document.getElementById('next-kyoku-msg').style.display = 'block';
-    if(isHost) {
-        handleReadyNext();
-    } else {
-        sendToHost({ type: 'READY_NEXT' });
-    }
+    if (isHost) handleReadyNext();
+    else sendToHost({ type: 'READY_NEXT' });
 }
 
 function proceedToNextKyoku() {
@@ -1609,7 +1792,11 @@ function proceedToNextKyoku() {
         broadcast({ type: 'MATCH_OVER', scores: playerScores, reason: 'tobi' });
         return;
     }
-    if (!isNextRenchan) { currentDealer = (currentDealer + 1) % 4; currentKyoku++; if(currentKyoku > 4) { currentKyoku = 1; currentBakaze++; } }
+    if (!isNextRenchan) {
+        currentDealer = (currentDealer + 1) % 4;
+        currentKyoku++;
+        if (currentKyoku > 4) { currentKyoku = 1; currentBakaze++; }
+    }
     if (currentBakaze >= gameRuleMaxRounds) {
         kyokuActive = false;
         broadcast({ type: 'MATCH_OVER', scores: playerScores, reason: 'end' });
@@ -1618,19 +1805,20 @@ function proceedToNextKyoku() {
     }
 }
 
-/** クライアント描画・UIロジック **/
 let myLocalHand = []; let roleMap = [];
 
 function toggleRiichi() {
     isPendingRiichi = !isPendingRiichi;
-    let btn = document.getElementById('btn-riichi');
-    btn.style.background = isPendingRiichi ? '#ff5722' : '#ff9800';
+    const button = document.getElementById('btn-riichi');
+    button.style.background = isPendingRiichi ? '#ff5722' : '#ff9800';
     renderHand(isMyTurnNow);
 }
 
 function toggleLockUnit(unitName) {
-    if(lockedUnits.has(unitName)) lockedUnits.delete(unitName); else lockedUnits.add(unitName);
-    reorderLockedTilesToLeft(); renderHand(isMyTurnNow);
+    if (lockedUnits.has(unitName)) lockedUnits.delete(unitName);
+    else lockedUnits.add(unitName);
+    reorderLockedTilesToLeft();
+    renderHand(isMyTurnNow);
 }
 
 function getUnlockedHand() {
@@ -2154,7 +2342,9 @@ function startActionTimer() {
 }
 
 function startDiscardTimer(label = '打牌してください', canTsumo = false) {
-    document.getElementById('action-bar').style.display = 'flex';
+    const actionBar = document.getElementById('action-bar');
+    const riichiButton = document.getElementById('btn-riichi');
+    actionBar.style.display = canTsumo || riichiButton.style.display !== 'none' ? 'flex' : 'none';
     showActionPrompt(label);
     if (!canTsumo) document.getElementById('btn-tsumo').style.display = 'none';
     document.getElementById('btn-ron').style.display = 'none';
