@@ -1524,34 +1524,32 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
     title.innerText = '点数移動';
     panel.appendChild(title);
 
-    const header = document.createElement('div');
-    header.className = 'result-transfer-row';
-    header.style.color = '#bbb';
-    header.innerHTML = '<span></span><span>移動前</span><span>移動後</span><span>増減</span>';
-    panel.appendChild(header);
+    const table = document.createElement('div');
+    table.className = 'result-transfer-table';
+    const appendCell = (text, className = '') => {
+        const cell = document.createElement('div');
+        cell.className = `result-transfer-cell ${className}`.trim();
+        cell.innerText = text;
+        table.appendChild(cell);
+        return cell;
+    };
+
+    appendCell('', 'header name');
+    appendCell('移動前', 'header');
+    appendCell('移動後', 'header');
+    appendCell('増減', 'header');
 
     for (let i = 0; i < 4; i++) {
         const before = Number((scoresBefore || scoresAfter)[i] || 0);
         const after = Number(scoresAfter[i] || 0);
         const delta = after - before;
-        const row = document.createElement('div');
-        row.className = 'result-transfer-row';
-
-        const name = document.createElement('span');
-        name.className = 'result-transfer-name';
-        name.innerText = globalPlayerNames[i] || `プレイヤー${i + 1}`;
-        const beforeValue = document.createElement('span');
-        beforeValue.innerText = `${before.toLocaleString('ja-JP')}点`;
-        const afterValue = document.createElement('span');
-        afterValue.innerText = `${after.toLocaleString('ja-JP')}点`;
-        const deltaValue = document.createElement('span');
-        deltaValue.className = 'result-transfer-delta';
-        deltaValue.style.color = delta > 0 ? '#81c784' : delta < 0 ? '#ef9a9a' : '#ddd';
-        deltaValue.innerText = `${delta > 0 ? '+' : ''}${delta.toLocaleString('ja-JP')}点`;
-
-        row.append(name, beforeValue, afterValue, deltaValue);
-        panel.appendChild(row);
+        appendCell(globalPlayerNames[i] || `プレイヤー${i + 1}`, 'name');
+        appendCell(`${before.toLocaleString('ja-JP')}点`);
+        appendCell(`${after.toLocaleString('ja-JP')}点`);
+        const deltaCell = appendCell(`${delta > 0 ? '+' : ''}${delta.toLocaleString('ja-JP')}点`, 'delta');
+        deltaCell.style.color = delta > 0 ? '#81c784' : delta < 0 ? '#ef9a9a' : '#ddd';
     }
+    panel.appendChild(table);
 
     if (note) {
         const noteElement = document.createElement('div');
@@ -1559,6 +1557,19 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
         noteElement.innerText = note;
         panel.appendChild(noteElement);
     }
+}
+
+function showActionPrompt(text) {
+    const prompt = document.getElementById('action-prompt');
+    const tableArea = document.getElementById('table-area');
+    const river = document.getElementById('river-0');
+    if (!prompt || !tableArea || !river) return;
+    prompt.innerText = text;
+    prompt.style.display = 'block';
+    const tableRect = tableArea.getBoundingClientRect();
+    const riverRect = river.getBoundingClientRect();
+    const promptHeight = prompt.getBoundingClientRect().height;
+    prompt.style.top = `${Math.max(4, riverRect.top - tableRect.top - promptHeight - 8)}px`;
 }
 
 function advanceResultStage() {
@@ -2144,7 +2155,7 @@ function startActionTimer() {
 
 function startDiscardTimer(label = '打牌してください', canTsumo = false) {
     document.getElementById('action-bar').style.display = 'flex';
-    document.getElementById('action-msg-text').innerText = label;
+    showActionPrompt(label);
     if (!canTsumo) document.getElementById('btn-tsumo').style.display = 'none';
     document.getElementById('btn-ron').style.display = 'none';
     const nakiContainer = document.getElementById('naki-buttons-container');
@@ -2245,7 +2256,7 @@ function handleHostMsg(data) {
             
             if (scoreInfo.han > 0) {
                 document.getElementById('action-bar').style.display = 'flex'; 
-                document.getElementById('action-msg-text').innerHTML = `ツモできます`; 
+                showActionPrompt('ツモできます');
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
                 document.getElementById('btn-ron').style.display = 'none'; 
                 document.getElementById('btn-skip').style.display = 'none'; 
@@ -2269,7 +2280,7 @@ function handleHostMsg(data) {
                 if (validWaits.length > 0) {
                     validRiichiDiscards = validWaits.map(w => w.discard);
                     document.getElementById('action-bar').style.display = 'flex';
-                    document.getElementById('action-msg-text').innerHTML = `リーチ可能です`;
+                    showActionPrompt('リーチ可能です');
                     document.getElementById('btn-riichi').style.display = 'inline-block';
                     discardPrompt = 'リーチ可能です';
                 }
@@ -2336,7 +2347,7 @@ function handleHostMsg(data) {
 
             if (canRon || nakiUnits) {
                 document.getElementById('action-bar').style.display = 'flex';
-                document.getElementById('action-msg-text').innerText = 'ロン・鳴き判断';
+                showActionPrompt('ロン・鳴き判断');
                 document.getElementById('btn-tsumo').style.display = 'none';
                 document.getElementById('btn-riichi').style.display = 'none';
                 document.getElementById('btn-skip').style.display = 'inline-block';
@@ -2389,7 +2400,7 @@ function handleHostMsg(data) {
             
             if (scoreInfo.han > 0) {
                 document.getElementById('action-bar').style.display = 'flex'; 
-                document.getElementById('action-msg-text').innerHTML = `ツモできます`; 
+                showActionPrompt('ツモできます');
                 document.getElementById('btn-tsumo').style.display = 'inline-block'; 
                 document.getElementById('btn-ron').style.display = 'none'; 
                 document.getElementById('btn-skip').style.display = 'none'; 
@@ -2566,6 +2577,7 @@ function hideActions() {
     clearInterval(actionTimerInterval); 
     document.getElementById('action-budget').innerText = '';
     document.getElementById('action-budget').style.visibility = 'hidden';
+    document.getElementById('action-prompt').style.display = 'none';
     document.getElementById('action-bar').style.display = 'none'; 
     document.getElementById('btn-tsumo').style.display = 'none'; 
     document.getElementById('btn-ron').style.display = 'none'; 
