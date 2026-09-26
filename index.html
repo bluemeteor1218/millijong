@@ -111,7 +111,7 @@
             z-index: 30; }
         #player-hand-row { display: flex; flex: 0 0 auto; align-items: flex-end; justify-content: flex-start; gap: 8px; min-width: 0; width: 100%; }
         #btn-sort-hand { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; background: #4aa9e6; min-height: 40px; }
-        #player-hand-scroll { display: flex; flex: 1 1 auto; align-items: flex-end; min-width: 0; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+        #player-hand-scroll { position: relative; display: flex; flex: 0 0 auto; align-items: flex-end; min-width: 0; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
         
         /* 牌の基本デザイン */
         .mahjong-tile { width: var(--other-tile-w); height: var(--other-tile-h); background: linear-gradient(to bottom, #fefefe, #e8e8e8); border-radius: 3px; border: 1px solid #999;
@@ -153,7 +153,8 @@
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
         #my-hand-area .tile-text { font-size: clamp(12px, 1.8vmin, 16px); }
         #my-hand-area .mahjong-tile.almighty .tile-text { font-size: clamp(16px, 2.4vmin, 22px); }
-        #my-open-area { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 2px; margin-left: calc(var(--hand-tile-w) * 2); }
+        #my-open-area { position: absolute; right: 0; bottom: 8px; display: flex; flex-direction: row-reverse; justify-content: flex-start; align-items: flex-end; gap: 2px;
+            width: max-content; max-width: none; overflow: visible; direction: ltr; }
         #my-open-area .mahjong-tile { flex: 0 0 auto; width: var(--hand-tile-w); height: var(--hand-tile-h); margin: 1px 2px; }
         
         /* 他家の手牌 */

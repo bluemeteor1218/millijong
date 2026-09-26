@@ -1973,10 +1973,7 @@ function revealTileImage(image, fallback, src) {
         if (image.naturalWidth <= 0) {
             revealFallback();
         } else if (typeof image.decode === 'function') {
-            image.decode().then(revealImage).catch(() => {
-                if (image.naturalWidth > 0) revealImage();
-                else revealFallback();
-            });
+            image.decode().then(revealImage).catch(revealFallback);
         } else {
             revealImage();
         }
