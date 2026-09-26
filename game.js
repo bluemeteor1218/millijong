@@ -1543,7 +1543,7 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
         beforeValue.innerText = `${before.toLocaleString('ja-JP')}点`;
         const afterValue = document.createElement('span');
         afterValue.innerText = `${after.toLocaleString('ja-JP')}点`;
-        const openArea = document.getElementById('my-open-area');
+        const deltaValue = document.createElement('span');
         deltaValue.className = 'result-transfer-delta';
         deltaValue.style.color = delta > 0 ? '#81c784' : delta < 0 ? '#ef9a9a' : '#ddd';
         deltaValue.innerText = `${delta > 0 ? '+' : ''}${delta.toLocaleString('ja-JP')}点`;
@@ -1553,14 +1553,15 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
     }
 
     if (note) {
-        const preferredBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
-        const minimumBudgetWidth = Math.min(72, preferredBudgetWidth);
-        const minimumTileWidth = 12;
-        const scrollStart = rowRect.left + sortWidth + rowGap;
-        let selectedTileWidth = Math.max(minimumTileWidth, baseTileWidth);
-        let budgetLeft = rowRect.right - preferredBudgetWidth;
-        let budgetWidth = preferredBudgetWidth;
-        let placementFits = false;
+        const noteElement = document.createElement('div');
+        noteElement.className = 'result-transfer-note';
+        noteElement.innerText = note;
+        panel.appendChild(noteElement);
+    }
+}
+
+function advanceResultStage() {
+    if (resultStage === 'details') {
         resultStage = 'transfer';
         document.getElementById('result-hand').style.display = 'none';
         document.getElementById('result-yaku').style.display = 'none';
