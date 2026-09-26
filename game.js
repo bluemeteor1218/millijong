@@ -18,6 +18,172 @@ function confirmReturnToLobby() {
     window.location.reload();
 }
 
+const customUnitNames = new Set(CUSTOM_UNIT_NAMES);
+const selectedCustomUnitMembers = new Set();
+
+function openUnitEditorLogin() {
+    document.getElementById('unit-login-status').innerText = '';
+    document.getElementById('unit-login-password-one').value = '';
+    document.getElementById('unit-login-password-two').value = '';
+    document.getElementById('unit-login-overlay').classList.add('open');
+    document.getElementById('unit-login-password-one').focus();
+}
+
+function closeUnitEditorLogin() {
+    document.getElementById('unit-login-overlay').classList.remove('open');
+}
+
+async function submitUnitEditorLogin() {
+    const status = document.getElementById('unit-login-status');
+    const submitButton = document.getElementById('unit-login-submit');
+    submitButton.disabled = true;
+    status.innerText = '';
+
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                passwordOne: document.getElementById('unit-login-password-one').value,
+                passwordTwo: document.getElementById('unit-login-password-two').value
+            })
+        });
+        if (!response.ok) {
+            status.innerText = response.status === 401
+                ? '2つのパスワードを確認してください。'
+                : response.status === 429
+                    ? '認証に複数回失敗したため、1分後に再試行してください。'
+                    : '認証サーバーでエラーが発生しました。';
+            return;
+        }
+        closeUnitEditorLogin();
+        openUnitEditor();
+    } catch (error) {
+        status.innerText = '認証サーバーに接続できません。サーバーから開いてください。';
+    } finally {
+        document.getElementById('unit-login-password-one').value = '';
+        document.getElementById('unit-login-password-two').value = '';
+        submitButton.disabled = false;
+    }
+}
+
+function populateUnitIdolButtons() {
+    const grid = document.getElementById('unit-idol-grid');
+    grid.replaceChildren();
+    selectedCustomUnitMembers.clear();
+    [...IDOLS.Princess, ...IDOLS.Fairy, ...IDOLS.Angel].forEach(idol => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'unit-idol-button';
+        button.innerText = idol;
+        button.setAttribute('aria-pressed', 'false');
+        button.addEventListener('click', () => {
+            if (selectedCustomUnitMembers.has(idol)) {
+                selectedCustomUnitMembers.delete(idol);
+                button.classList.remove('selected');
+                button.setAttribute('aria-pressed', 'false');
+            } else {
+                selectedCustomUnitMembers.add(idol);
+                button.classList.add('selected');
+                button.setAttribute('aria-pressed', 'true');
+            }
+            document.getElementById('unit-selection-count').innerText = `${selectedCustomUnitMembers.size}人選択中`;
+        });
+        grid.appendChild(button);
+    });
+    document.getElementById('unit-selection-count').innerText = 'アイドルを選択してください';
+}
+
+function openUnitEditor() {
+    populateUnitIdolButtons();
+    document.getElementById('unit-name-input').value = '';
+    document.getElementById('unit-editor-status').innerText = '';
+    document.getElementById('unit-editor-overlay').classList.add('open');
+}
+
+function getCustomUnitDefinitions() {
+    return [...customUnitNames].map(name => ({ name, members: [...UNIT_BY_NAME[name].members] }));
+}
+
+function replaceCustomUnits(units) {
+    for (const name of customUnitNames) {
+        delete RAW_UNITS[name];
+        delete UNIT_BY_NAME[name];
+        const index = OFFICIAL_UNITS.findIndex(unit => unit.name === name);
+        if (index !== -1) OFFICIAL_UNITS.splice(index, 1);
+    }
+    customUnitNames.clear();
+
+    const validIdols = new Set([...IDOLS.Princess, ...IDOLS.Fairy, ...IDOLS.Angel]);
+    for (const definition of Array.isArray(units) ? units : []) {
+        const name = typeof definition.name === 'string' ? definition.name.trim() : '';
+        const members = Array.isArray(definition.members) ? [...new Set(definition.members)] : [];
+        if (!name || /[<>]/.test(name) || members.length < 2 || members.some(idol => !validIdols.has(idol))) continue;
+        if (Object.prototype.hasOwnProperty.call(RAW_UNITS, name)) continue;
+
+        const unit = { name, members, score: members.length - 2 };
+        RAW_UNITS[name] = members;
+        UNIT_BY_NAME[name] = unit;
+        OFFICIAL_UNITS.push(unit);
+        customUnitNames.add(name);
+    }
+    _unitsBySizeDesc = null;
+    _unitsByTile = null;
+    _progressKey = '';
+    _tenpaiProgressKey = '';
+}
+
+async function addCustomUnit() {
+    const name = document.getElementById('unit-name-input').value.trim();
+    const members = [...selectedCustomUnitMembers];
+    const status = document.getElementById('unit-editor-status');
+    if (!name) {
+        status.innerText = 'ユニット名を入力してください。';
+        return;
+    }
+    if (/[<>]/.test(name)) {
+        status.innerText = 'ユニット名に < または > は使用できません。';
+        return;
+    }
+    if (UNIT_BY_NAME[name]) {
+        status.innerText = '同じ名前のユニットが既にあります。';
+        return;
+    }
+    if (members.length < 2) {
+        status.innerText = 'アイドルを2人以上選択してください。';
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/units', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, members })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            const messages = {
+                401: 'セッションが切れました。もう一度ログインしてください。',
+                409: '同じ名前のユニットが既にあります。',
+                400: 'ユニット名またはメンバーを確認してください。'
+            };
+            status.innerText = messages[response.status] || 'data.jsを更新できませんでした。';
+            return;
+        }
+        replaceCustomUnits(result.customUnits);
+    } catch (error) {
+        status.innerText = 'サーバーに接続できないか、data.jsを更新できませんでした。';
+        return;
+    }
+    document.getElementById('unit-name-input').value = '';
+    populateUnitIdolButtons();
+    status.innerText = `「${name}」を追加しました。続けて追加できます。`;
+}
+
+function returnToLobbyFromUnitEditor() {
+    document.getElementById('unit-editor-overlay').classList.remove('open');
+}
+
 /*
 let _actionBudgetMeasureContext = null;
 function layoutActionBudget() {
@@ -1323,9 +1489,10 @@ function startKyoku() {
     for(let i=0; i<4; i++) { playerHands[i] = deck.splice(-12); playerHands[i].sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999)); }
     isWaitingAction = false; currentTurn = currentDealer; currentTurnHasDrawn = false;
     clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
+    const customUnits = getCustomUnitDefinitions();
     
     playerRoles.forEach((role, idx) => {
-        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, favorites: playerFavorites, timerSettings: roomTimerSettings, thinkingPools: [...playerThinkingPools], handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
+        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, favorites: playerFavorites, customUnits, timerSettings: roomTimerSettings, thinkingPools: [...playerThinkingPools], handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
         if(role === 'HOST') handleHostMsg(msg);
         else if(role === 'CLIENT') sendToClient(idx, msg);
     });
@@ -2511,6 +2678,7 @@ function handleHostMsg(data) {
     }
 
     if(data.type === 'START_KYOKU') {
+        replaceCustomUnits(data.customUnits || []);
         hideWaitOverlay();
         const dov = document.getElementById('disconnect-overlay');
         if (dov) dov.style.display = 'none';
@@ -2529,6 +2697,8 @@ function handleHostMsg(data) {
         
         document.getElementById('setup-panel').style.display = 'none'; 
         document.getElementById('app-container').style.display = 'flex'; 
+        document.getElementById('btn-open-unit-login').style.display = 'none';
+        document.getElementById('btn-return-lobby').style.display = 'block';
         document.getElementById('deck-count').innerText = data.deckLen; document.getElementById('round-info').innerText = `${ROUND_NAMES[data.bakaze]}${data.kyoku}局`;
         isMyTurnNow = false; isPendingRiichi = false; document.getElementById('action-status').style.visibility = 'hidden';
         document.getElementById('river-0').innerHTML=''; document.getElementById('river-1').innerHTML=''; document.getElementById('river-2').innerHTML=''; document.getElementById('river-3').innerHTML='';

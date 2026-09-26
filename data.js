@@ -33,6 +33,8 @@ const RAW_UNITS = {
     "あんロコ": ["望月杏奈","ロコ"],"すばゆり":["七尾百合子","永吉昴"],"すばロコ":["永吉昴","ロコ"]
 };
 
+const CUSTOM_UNIT_NAMES = [];
+
 const OFFICIAL_UNITS = Object.keys(RAW_UNITS).map(name => {
     let members = RAW_UNITS[name]; let score = members.length - 2; 
     return { name: name, members: members, score: score };
