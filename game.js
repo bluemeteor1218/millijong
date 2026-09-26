@@ -6,6 +6,48 @@ function toggleSidebar() {
     overlay.classList.toggle('open');
 }
 
+let _actionBudgetMeasureContext = null;
+function layoutActionBudget() {
+    const row = document.getElementById('player-hand-row');
+    const sortButton = document.getElementById('btn-sort-hand');
+    const hand = document.getElementById('my-hand-area');
+    const budget = document.getElementById('action-budget');
+    if (!row || !sortButton || !hand || !budget) return;
+
+    const rowWidth = row.clientWidth;
+    if (rowWidth < 1) return;
+    const rowStyle = getComputedStyle(row);
+    const gap = parseFloat(rowStyle.columnGap) || 0;
+    const buttonWidth = sortButton.getBoundingClientRect().width;
+    const reservedBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+    const maxHandWidth = Math.max(0, rowWidth - buttonWidth - reservedBudgetWidth - gap * 2);
+    hand.style.maxWidth = `${maxHandWidth}px`;
+    const actualHandWidth = hand.getBoundingClientRect().width;
+    const availableBudgetWidth = Math.max(0, rowWidth - buttonWidth - actualHandWidth - gap * 2);
+    const budgetWidth = Math.min(240, availableBudgetWidth);
+    budget.style.width = `${budgetWidth}px`;
+    budget.style.flexBasis = `${budgetWidth}px`;
+    budget.style.marginLeft = 'auto';
+
+    if (!_actionBudgetMeasureContext) {
+        _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
+    }
+    if (!_actionBudgetMeasureContext) return;
+    const budgetStyle = getComputedStyle(budget);
+    const horizontalChrome = parseFloat(budgetStyle.paddingLeft) + parseFloat(budgetStyle.paddingRight)
+        + parseFloat(budgetStyle.borderLeftWidth) + parseFloat(budgetStyle.borderRightWidth);
+    const availableTextWidth = Math.max(0, budgetWidth - horizontalChrome);
+    const longestTimeText = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0
+        ? '0秒＋10秒'
+        : `${roomTimerSettings.basicSeconds}秒＋${roomTimerSettings.poolSeconds}秒`;
+    let fontSize = 54;
+    for (; fontSize > 10; fontSize--) {
+        _actionBudgetMeasureContext.font = `800 ${fontSize}px ${budgetStyle.fontFamily}`;
+        if (_actionBudgetMeasureContext.measureText(longestTimeText).width <= availableTextWidth) break;
+    }
+    budget.style.fontSize = `${fontSize}px`;
+}
+
 let _layoutLock = false;
 let _layoutPending = false;
 let _tableResizeObserver = null;
@@ -108,6 +150,7 @@ function layoutTable() {
     if (rightSeat) rightSeat.style.left = isPortrait ? '88%' : '87%';
     if (topSeat) topSeat.style.top = isCompactLandscape ? '3%' : '6%';
     if (leftSeat) leftSeat.style.left = isPortrait ? '12%' : '13%';
+    layoutActionBudget();
 }
 
 let useAlmForProgress = true;
@@ -1979,6 +2022,7 @@ function finishDecisionTimer() {
 
 function startDecisionTimer(label, onExpire, isNakiDecision = false) {
     clearInterval(actionTimerInterval);
+    layoutActionBudget();
     const budget = document.getElementById('action-budget');
     const noTurnLimit = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0;
     if (noTurnLimit && !isNakiDecision) {
@@ -2445,6 +2489,7 @@ function renderHand(isMyTurn) {
     }
 
     div.replaceChildren(fragment);
+    layoutActionBudget();
     scheduleProgressUI();
 }
 
