@@ -104,11 +104,12 @@
             box-shadow: inset 0 0 90px rgba(0,0,0,0.28);
             border-radius: 0;
         }
-        #player-dock { flex: 0 0 auto; display: flex; align-items: flex-end; justify-content: center; gap: 8px;
-            min-height: calc(var(--hand-tile-h) + 34px + var(--tile-depth));
-            padding: 14px 10px calc(12px + env(safe-area-inset-bottom));
+        #player-dock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 4px;
+            min-height: calc(var(--hand-tile-h) + 58px + var(--tile-depth));
+            padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
             background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0));
             z-index: 30; }
+        #player-hand-row { display: flex; flex: 0 0 auto; align-items: flex-end; justify-content: center; gap: 8px; min-width: 0; }
         #btn-sort-hand { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; background: #4aa9e6; min-height: 40px; }
         
         /* 牌の基本デザイン */
@@ -231,9 +232,8 @@
 
         /* アクションボタン（スマホ対応で下部中央へ） */
         .action-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(255, 235, 59, 0.95); padding: 8px 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96vw, 640px); flex-wrap: wrap; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
-        #action-budget { position: absolute; right: 10px; bottom: calc(var(--player-dock-height, 120px) + 6px); z-index: 250;
-            display: none; padding: 6px 10px; border: 1px solid #fbc02d; border-radius: 6px;
-            background: rgba(10,16,22,0.94); color: #ffeb3b; font-size: 13px; font-weight: bold;
+        #action-budget { display: none; align-self: flex-end; margin: 0 8px; padding: 5px 12px; border: 2px solid #fbc02d; border-radius: 6px;
+            background: rgba(10,16,22,0.94); color: #ffeb3b; font-size: 18px; font-weight: bold; line-height: 1.25;
             font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
         
         #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300; pointer-events: none; display: flex; flex-direction: column; gap: 5px; align-items: center; }
@@ -446,11 +446,12 @@
                     <button class="btn" id="btn-skip" style="display:none; background: #999;" onclick="sendAction('SKIP'); hideActions();">見逃す</button>
                 </div>
             </div>
-            <div id="action-budget" aria-live="off"></div>
-
             <div id="player-dock">
-                <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
-                <div id="my-hand-area"></div>
+                <div id="action-budget" aria-live="off"></div>
+                <div id="player-hand-row">
+                    <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
+                    <div id="my-hand-area"></div>
+                </div>
             </div>
         </div>
     </div>
