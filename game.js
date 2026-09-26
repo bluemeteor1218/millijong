@@ -7,102 +7,107 @@ function toggleSidebar() {
 }
 
 let _actionBudgetMeasureContext = null;
-function layoutMeldGap() {
-    const hand = document.getElementById('my-hand-area');
-    const spacer = hand && hand.querySelector('[data-hand-kind="spacer"]');
-    const firstClosed = hand && hand.querySelector('[data-hand-kind="closed"]');
-    const firstOpen = hand && hand.querySelector('[data-hand-kind="open"]');
-    if (!hand || !spacer || !firstClosed || !firstOpen) return;
-
-    const closedStyle = getComputedStyle(firstClosed);
-    const tileWidth = firstClosed.getBoundingClientRect().width;
-    const tileMargins = (parseFloat(closedStyle.marginLeft) || 0) + (parseFloat(closedStyle.marginRight) || 0);
-    const flexGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
-    const tileStep = tileWidth + tileMargins + flexGap;
-    const targetOpenLeft = firstClosed.getBoundingClientRect().left + 12 * tileStep + 3 * tileWidth;
-    const spacerLeft = spacer.getBoundingClientRect().left;
-    const openMargin = parseFloat(getComputedStyle(firstOpen).marginLeft) || 0;
-    const spacerWidth = Math.max(0, targetOpenLeft - spacerLeft - flexGap - openMargin);
-    spacer.style.width = `${spacerWidth}px`;
-    spacer.style.flex = `0 0 ${spacerWidth}px`;
-}
-
 function layoutActionBudget() {
     const row = document.getElementById('player-hand-row');
     const sortButton = document.getElementById('btn-sort-hand');
+    const scroll = document.getElementById('player-hand-scroll');
     const hand = document.getElementById('my-hand-area');
     const budget = document.getElementById('action-budget');
     const dock = document.getElementById('player-dock');
     const gameBoard = document.getElementById('game-board');
-    if (!row || !sortButton || !hand || !budget || !dock || !gameBoard) return;
+    if (!row || !sortButton || !scroll || !hand || !budget || !dock || !gameBoard) return;
 
     const rowWidth = row.clientWidth;
     if (rowWidth < 1) return;
-    layoutMeldGap();
     const rowStyle = getComputedStyle(row);
     const gap = parseFloat(rowStyle.columnGap) || 0;
     const buttonWidth = sortButton.getBoundingClientRect().width;
-    const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
-    budget.style.width = `${budgetWidth}px`;
-    const rowRect = row.getBoundingClientRect();
-    const dockRect = dock.getBoundingClientRect();
-    budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
-    budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
-
-    const timerRect = budget.getBoundingClientRect();
-    const playLeft = gameBoard.getBoundingClientRect().left;
-    hand.style.removeProperty('--hand-tile-w');
-    hand.style.removeProperty('--hand-tile-h');
-    const rootStyle = getComputedStyle(document.documentElement);
-    const rootTileWidth = parseFloat(rootStyle.getPropertyValue('--hand-tile-w')) || 30;
-    const rootTileHeight = parseFloat(rootStyle.getPropertyValue('--hand-tile-h')) || rootTileWidth * 1.4;
-    const tile = hand.querySelector('[data-hand-kind="closed"]') || hand.querySelector('.mahjong-tile');
-    const tileStyle = tile ? getComputedStyle(tile) : null;
-    const marginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
-    const marginRight = tileStyle ? parseFloat(tileStyle.marginRight) || 0 : 2;
-    const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
-    const handBaseLeft = rowRect.left + buttonWidth + gap;
-    const targetCenter = (playLeft + timerRect.left) / 2;
-    const baseTileLeft = handBaseLeft + marginLeft;
-    const openTiles = [...hand.querySelectorAll('[data-hand-kind="open"]')];
-    const openCount = openTiles.length;
-    const tileCoefficient = 13 + (openCount ? openCount + 2 : 0);
-    const fixedTileSpacing = 12 * (marginLeft + marginRight + handGap)
-        + (openCount > 1 ? (openCount - 1) * (marginLeft + marginRight + handGap) : 0);
-    const centerCapacity = Math.max(0, 2 * (targetCenter - baseTileLeft));
-    const rightCapacity = Math.max(0, timerRect.left - baseTileLeft - gap);
-    const maxCenteredHandWidth = Math.max(0, Math.min(centerCapacity, rightCapacity));
-    const fittedTileWidth = (maxCenteredHandWidth - fixedTileSpacing) / tileCoefficient;
-    if (fittedTileWidth >= 18 && fittedTileWidth < rootTileWidth) {
-        hand.style.setProperty('--hand-tile-w', `${fittedTileWidth}px`);
-        hand.style.setProperty('--hand-tile-h', `${fittedTileWidth * rootTileHeight / rootTileWidth}px`);
-    }
-
-    layoutMeldGap();
-    const tileWidth = parseFloat(getComputedStyle(hand.querySelector('.mahjong-tile') || hand).getPropertyValue('--hand-tile-w')) || rootTileWidth;
-    const closedHandWidth = 12 * (tileWidth + marginLeft + marginRight + handGap) + tileWidth;
-    const openGroupWidth = openTiles.length
-        ? openTiles[openTiles.length - 1].getBoundingClientRect().right - openTiles[0].getBoundingClientRect().left
-        : 0;
-    const meldSpacing = openTiles.length ? 2 * tileWidth : 0;
-    const thirteenTileWidth = closedHandWidth + meldSpacing + openGroupWidth;
-    const targetHandLeft = targetCenter - thirteenTileWidth / 2 - marginLeft;
-    const handOffset = Math.max(0, targetHandLeft - handBaseLeft);
-    hand.style.marginLeft = `${handOffset}px`;
-    const handMaxWidth = Math.max(0, timerRect.left - handBaseLeft - handOffset - gap);
-    hand.style.maxWidth = `${handMaxWidth}px`;
-
+    const preferredBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
     if (!_actionBudgetMeasureContext) {
         _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
     }
     if (!_actionBudgetMeasureContext) return;
-    const budgetStyle = getComputedStyle(budget);
-    const horizontalChrome = parseFloat(budgetStyle.paddingLeft) + parseFloat(budgetStyle.paddingRight)
-        + parseFloat(budgetStyle.borderLeftWidth) + parseFloat(budgetStyle.borderRightWidth);
-    const availableTextWidth = Math.max(0, budgetWidth - horizontalChrome);
+    const initialBudgetStyle = getComputedStyle(budget);
+    const horizontalChrome = parseFloat(initialBudgetStyle.paddingLeft) + parseFloat(initialBudgetStyle.paddingRight)
+        + parseFloat(initialBudgetStyle.borderLeftWidth) + parseFloat(initialBudgetStyle.borderRightWidth);
     const longestTimeText = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0
         ? '0秒＋10秒'
         : `${roomTimerSettings.basicSeconds}秒＋${roomTimerSettings.poolSeconds}秒`;
+    const availableScreenHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const targetFontSize = Math.min(32, Math.max(18, Math.min(rowWidth * 0.05, availableScreenHeight * 0.08)));
+    _actionBudgetMeasureContext.font = `800 ${targetFontSize}px ${initialBudgetStyle.fontFamily}`;
+    const minimumFontBox = Math.ceil(_actionBudgetMeasureContext.measureText(longestTimeText).width + horizontalChrome);
+    let budgetWidth = preferredBudgetWidth;
+    budget.style.width = `${budgetWidth}px`;
+    const scrollWidth = Math.max(0, rowWidth - buttonWidth - budgetWidth - gap * 2);
+    scroll.style.width = `${scrollWidth}px`;
+    scroll.style.flexBasis = `${scrollWidth}px`;
+    const rowRect = row.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    let budgetLeft = rowRect.right - budgetWidth;
+    const minimumBudgetWidth = Math.min(minimumFontBox, preferredBudgetWidth);
+    budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
+    budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
+
+    const playLeft = gameBoard.getBoundingClientRect().left;
+    const tile = hand.querySelector('.mahjong-tile');
+    const tileStyle = tile ? getComputedStyle(tile) : null;
+    const root = document.documentElement;
+    let tileWidth = parseFloat(getComputedStyle(root).getPropertyValue('--hand-tile-base-w'))
+        || parseFloat(getComputedStyle(root).getPropertyValue('--hand-tile-w')) || 30;
+    const marginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
+    const horizontalMargins = tileStyle ? marginLeft + (parseFloat(tileStyle.marginRight) || 0) : 4;
+    const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+    const openArea = document.getElementById('my-open-area');
+    const openTileCount = openArea ? openArea.children.length : 0;
+    let scrollRect = scroll.getBoundingClientRect();
+    const baseHandTileWidth = tileWidth;
+    let concealedHandWidth = 13 * (tileWidth + horizontalMargins) + 12 * handGap;
+    let placementFits = openTileCount === 0;
+
+    for (let candidateWidth = baseHandTileWidth; openTileCount > 0 && candidateWidth >= 12; candidateWidth--) {
+        const candidateLaneWidth = 13 * (candidateWidth + horizontalMargins) + 12 * handGap;
+        const candidateMeldWidth = (candidateWidth * 2)
+            + (openTileCount * (candidateWidth + horizontalMargins))
+            + ((openTileCount - 1) * 2);
+        const candidateBudgetLeft = playLeft + candidateLaneWidth - (marginLeft * 2)
+            + (2 * (candidateMeldWidth + gap));
+        const availableBudgetWidth = rowRect.right - candidateBudgetLeft;
+        const firstTileLeft = ((playLeft + candidateBudgetLeft) / 2) - (candidateLaneWidth / 2);
+        const canCenterHand = firstTileLeft - marginLeft >= scrollRect.left;
+        if (availableBudgetWidth >= minimumFontBox && canCenterHand) {
+            tileWidth = candidateWidth;
+            concealedHandWidth = candidateLaneWidth;
+            budgetLeft = candidateBudgetLeft;
+            budgetWidth = Math.min(preferredBudgetWidth, availableBudgetWidth);
+            placementFits = true;
+            break;
+        }
+    }
+    if (!placementFits) {
+        tileWidth = baseHandTileWidth;
+        concealedHandWidth = 13 * (tileWidth + horizontalMargins) + 12 * handGap;
+        budgetWidth = preferredBudgetWidth;
+        budgetLeft = rowRect.right - budgetWidth;
+    }
+    root.style.setProperty('--hand-tile-w', `${tileWidth}px`);
+    root.style.setProperty('--hand-tile-h', `${tileWidth * 1.4}px`);
+    root.style.setProperty('--concealed-hand-width', `${concealedHandWidth}px`);
+    root.style.setProperty('--tile-depth', `${Math.max(3, Math.min(6, tileWidth * 0.12))}px`);
+
+    scrollRect = scroll.getBoundingClientRect();
+    const targetFirstTileLeft = ((playLeft + budgetLeft) / 2) - (concealedHandWidth / 2);
+    hand.style.marginLeft = `${Math.max(0, targetFirstTileLeft - scrollRect.left - marginLeft)}px`;
+
+    budget.style.left = `${budgetLeft - dockRect.left}px`;
+    budget.style.right = 'auto';
+    budget.style.width = `${budgetWidth}px`;
+    const finalScrollWidth = Math.max(0, budgetLeft - scrollRect.left - gap);
+    scroll.style.width = `${finalScrollWidth}px`;
+    scroll.style.flexBasis = `${finalScrollWidth}px`;
+
+    const budgetStyle = getComputedStyle(budget);
+    const availableTextWidth = Math.max(0, budgetWidth - horizontalChrome);
     let fontSize = 54;
     for (; fontSize > 10; fontSize--) {
         _actionBudgetMeasureContext.font = `800 ${fontSize}px ${budgetStyle.fontFamily}`;
@@ -147,6 +152,7 @@ function layoutTable() {
     const isCompactLandscape = !isPortrait && height < 480;
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
     const handHeight = clamp(handWidth * 1.4, 34, 64);
+    const concealedHandWidth = (13 * (handWidth + 4)) + (12 * 2);
     const riverLength = isPortrait ? height : width;
     const riverWidth = clamp(Math.min(width * 0.073, height * 0.07, (riverLength - 34) / 18), 12, 48);
     const riverHeight = riverWidth * 1.4;
@@ -156,7 +162,9 @@ function layoutTable() {
     const tilt = height < 420 ? 22 : height < 560 ? 25 : 28;
 
     root.style.setProperty('--hand-tile-w', `${handWidth}px`);
+    root.style.setProperty('--hand-tile-base-w', `${handWidth}px`);
     root.style.setProperty('--hand-tile-h', `${handHeight}px`);
+    root.style.setProperty('--concealed-hand-width', `${concealedHandWidth}px`);
     root.style.setProperty('--river-tile-w', `${riverWidth}px`);
     root.style.setProperty('--river-tile-h', `${riverHeight}px`);
     root.style.setProperty('--other-tile-w', `${otherWidth}px`);
@@ -1535,7 +1543,7 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
         beforeValue.innerText = `${before.toLocaleString('ja-JP')}点`;
         const afterValue = document.createElement('span');
         afterValue.innerText = `${after.toLocaleString('ja-JP')}点`;
-        const deltaValue = document.createElement('span');
+        const openArea = document.getElementById('my-open-area');
         deltaValue.className = 'result-transfer-delta';
         deltaValue.style.color = delta > 0 ? '#81c784' : delta < 0 ? '#ef9a9a' : '#ddd';
         deltaValue.innerText = `${delta > 0 ? '+' : ''}${delta.toLocaleString('ja-JP')}点`;
@@ -1545,15 +1553,14 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
     }
 
     if (note) {
-        const noteElement = document.createElement('div');
-        noteElement.className = 'result-transfer-note';
-        noteElement.innerText = note;
-        panel.appendChild(noteElement);
-    }
-}
-
-function advanceResultStage() {
-    if (resultStage === 'details') {
+        const preferredBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+        const minimumBudgetWidth = Math.min(72, preferredBudgetWidth);
+        const minimumTileWidth = 12;
+        const scrollStart = rowRect.left + sortWidth + rowGap;
+        let selectedTileWidth = Math.max(minimumTileWidth, baseTileWidth);
+        let budgetLeft = rowRect.right - preferredBudgetWidth;
+        let budgetWidth = preferredBudgetWidth;
+        let placementFits = false;
         resultStage = 'transfer';
         document.getElementById('result-hand').style.display = 'none';
         document.getElementById('result-yaku').style.display = 'none';
@@ -2471,23 +2478,25 @@ function handleHostMsg(data) {
 
 function renderHand(isMyTurn) {
     const div = document.getElementById('my-hand-area');
+    const openDiv = document.getElementById('my-open-area');
     const closedTilesByName = new Map();
     const openTilesByName = new Map();
-    let spacer = null;
-    Array.from(div.children).forEach(element => {
-        if (element.dataset.handKind === 'spacer') spacer = element;
-        else if (element.classList.contains('mahjong-tile')) {
-            const tilesByName = element.dataset.handKind === 'open' ? openTilesByName : closedTilesByName;
+    const collectReusableTiles = (container, tilesByName) => {
+        Array.from(container.children).forEach(element => {
+            if (!element.classList.contains('mahjong-tile')) return;
             const tile = element.dataset.tile;
             if (!tilesByName.has(tile)) tilesByName.set(tile, []);
             tilesByName.get(tile).push(element);
-        }
-    });
+        });
+    };
+    collectReusableTiles(div, closedTilesByName);
+    collectReusableTiles(openDiv, openTilesByName);
     const takeReusableTile = (tilesByName, tile) => {
         const matching = tilesByName.get(tile);
         return matching && matching.length ? matching.shift() : createTileElement(tile, true);
     };
     const fragment = document.createDocumentFragment();
+    const openFragment = document.createDocumentFragment();
 
     myLocalHand.forEach((tile, idx) => {
         let isLocked = currentLockedIndices.has(idx);
@@ -2538,20 +2547,15 @@ function renderHand(isMyTurn) {
     });
     
     let myOpen = globalOpenTiles[myId] || [];
-    if (myOpen.length > 0) {
-        if (!spacer) spacer = document.createElement('div');
-        spacer.dataset.handKind = 'spacer';
-        spacer.style.width = '20px';
-        fragment.appendChild(spacer);
-        myOpen.forEach(tile => {
-            let el = takeReusableTile(openTilesByName, tile);
-            el.dataset.handKind = 'open';
-            el.classList.add('open-tile'); el.style.cursor = 'default';
-            fragment.appendChild(el);
-        });
-    }
+    myOpen.forEach(tile => {
+        let el = takeReusableTile(openTilesByName, tile);
+        el.dataset.handKind = 'open';
+        el.classList.add('open-tile'); el.style.cursor = 'default';
+        openFragment.appendChild(el);
+    });
 
     div.replaceChildren(fragment);
+    openDiv.replaceChildren(openFragment);
     layoutActionBudget();
     scheduleProgressUI();
 }
