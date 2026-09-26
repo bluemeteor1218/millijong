@@ -2045,9 +2045,10 @@ function toggleLockUnit(unitName) {
     renderHand(isMyTurnNow);
 }
 
-function getUnlockedHand() {
+function getUnlockedHand(excludedUnitName = null) {
     let tempHand = [...myLocalHand]; let consumedIndices = new Set();
     for (let unitName of lockedUnits) {
+        if (unitName === excludedUnitName) continue;
         let unit = (typeof UNIT_BY_NAME !== "undefined" && UNIT_BY_NAME[unitName]) || OFFICIAL_UNITS.find(u => u.name === unitName); if (!unit) continue;
         let missing = [];
         for (let req of unit.members) {
@@ -2886,7 +2887,22 @@ function handleHostMsg(data) {
             }
             
             let unlocked = getUnlockedHand();
-            let nakiUnits = globalPlayerRiichi[myId] ? null : checkCanNaki(unlocked, data.tile, useAlmightyForNaki);
+            let nakiUnits = null;
+            if (!globalPlayerRiichi[myId]) {
+                const candidates = new Set(checkCanNaki(unlocked, data.tile, useAlmightyForNaki) || []);
+                for (const lockedUnitName of lockedUnits) {
+                    if (candidates.has(lockedUnitName)) continue;
+                    const lockedCandidates = checkCanNaki(
+                        getUnlockedHand(lockedUnitName),
+                        data.tile,
+                        useAlmightyForNaki
+                    );
+                    if (lockedCandidates && lockedCandidates.includes(lockedUnitName)) {
+                        candidates.add(lockedUnitName);
+                    }
+                }
+                nakiUnits = candidates.size ? [...candidates] : null;
+            }
 
             if (canRon || nakiUnits) {
                 document.getElementById('action-bar').style.display = 'flex';
