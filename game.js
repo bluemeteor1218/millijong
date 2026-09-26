@@ -7,6 +7,26 @@ function toggleSidebar() {
 }
 
 let _actionBudgetMeasureContext = null;
+function layoutMeldGap() {
+    const hand = document.getElementById('my-hand-area');
+    const spacer = hand && hand.querySelector('[data-hand-kind="spacer"]');
+    const firstClosed = hand && hand.querySelector('[data-hand-kind="closed"]');
+    const firstOpen = hand && hand.querySelector('[data-hand-kind="open"]');
+    if (!hand || !spacer || !firstClosed || !firstOpen) return;
+
+    const closedStyle = getComputedStyle(firstClosed);
+    const tileWidth = firstClosed.getBoundingClientRect().width;
+    const tileMargins = (parseFloat(closedStyle.marginLeft) || 0) + (parseFloat(closedStyle.marginRight) || 0);
+    const flexGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+    const tileStep = tileWidth + tileMargins + flexGap;
+    const targetOpenLeft = firstClosed.getBoundingClientRect().left + 12 * tileStep + 3 * tileWidth;
+    const spacerLeft = spacer.getBoundingClientRect().left;
+    const openMargin = parseFloat(getComputedStyle(firstOpen).marginLeft) || 0;
+    const spacerWidth = Math.max(0, targetOpenLeft - spacerLeft - flexGap - openMargin);
+    spacer.style.width = `${spacerWidth}px`;
+    spacer.style.flex = `0 0 ${spacerWidth}px`;
+}
+
 function layoutActionBudget() {
     const row = document.getElementById('player-hand-row');
     const sortButton = document.getElementById('btn-sort-hand');
@@ -18,6 +38,7 @@ function layoutActionBudget() {
 
     const rowWidth = row.clientWidth;
     if (rowWidth < 1) return;
+    layoutMeldGap();
     const rowStyle = getComputedStyle(row);
     const gap = parseFloat(rowStyle.columnGap) || 0;
     const buttonWidth = sortButton.getBoundingClientRect().width;
@@ -30,18 +51,45 @@ function layoutActionBudget() {
 
     const timerRect = budget.getBoundingClientRect();
     const playLeft = gameBoard.getBoundingClientRect().left;
-    const tile = hand.querySelector('.mahjong-tile');
+    hand.style.removeProperty('--hand-tile-w');
+    hand.style.removeProperty('--hand-tile-h');
+    const rootStyle = getComputedStyle(document.documentElement);
+    const rootTileWidth = parseFloat(rootStyle.getPropertyValue('--hand-tile-w')) || 30;
+    const rootTileHeight = parseFloat(rootStyle.getPropertyValue('--hand-tile-h')) || rootTileWidth * 1.4;
+    const tile = hand.querySelector('[data-hand-kind="closed"]') || hand.querySelector('.mahjong-tile');
     const tileStyle = tile ? getComputedStyle(tile) : null;
-    const tileWidth = tile ? tile.getBoundingClientRect().width : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-tile-w')) || 30;
     const marginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
-    const horizontalMargins = tileStyle ? marginLeft + (parseFloat(tileStyle.marginRight) || 0) : 4;
+    const marginRight = tileStyle ? parseFloat(tileStyle.marginRight) || 0 : 2;
     const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
-    const openSeparator = hand.querySelector('[data-hand-kind="spacer"]') ? parseFloat(hand.querySelector('[data-hand-kind="spacer"]').style.width) || 0 : 0;
-    const thirteenTileWidth = 13 * (tileWidth + horizontalMargins) + 12 * handGap + openSeparator;
-    const targetHandLeft = ((playLeft + timerRect.left) / 2) - (thirteenTileWidth / 2) - marginLeft;
-    const handOffset = Math.max(0, targetHandLeft - rowRect.left);
+    const handBaseLeft = rowRect.left + buttonWidth + gap;
+    const targetCenter = (playLeft + timerRect.left) / 2;
+    const baseTileLeft = handBaseLeft + marginLeft;
+    const openTiles = [...hand.querySelectorAll('[data-hand-kind="open"]')];
+    const openCount = openTiles.length;
+    const tileCoefficient = 13 + (openCount ? openCount + 2 : 0);
+    const fixedTileSpacing = 12 * (marginLeft + marginRight + handGap)
+        + (openCount > 1 ? (openCount - 1) * (marginLeft + marginRight + handGap) : 0);
+    const centerCapacity = Math.max(0, 2 * (targetCenter - baseTileLeft));
+    const rightCapacity = Math.max(0, timerRect.left - baseTileLeft - gap);
+    const maxCenteredHandWidth = Math.max(0, Math.min(centerCapacity, rightCapacity));
+    const fittedTileWidth = (maxCenteredHandWidth - fixedTileSpacing) / tileCoefficient;
+    if (fittedTileWidth >= 18 && fittedTileWidth < rootTileWidth) {
+        hand.style.setProperty('--hand-tile-w', `${fittedTileWidth}px`);
+        hand.style.setProperty('--hand-tile-h', `${fittedTileWidth * rootTileHeight / rootTileWidth}px`);
+    }
+
+    layoutMeldGap();
+    const tileWidth = parseFloat(getComputedStyle(hand.querySelector('.mahjong-tile') || hand).getPropertyValue('--hand-tile-w')) || rootTileWidth;
+    const closedHandWidth = 12 * (tileWidth + marginLeft + marginRight + handGap) + tileWidth;
+    const openGroupWidth = openTiles.length
+        ? openTiles[openTiles.length - 1].getBoundingClientRect().right - openTiles[0].getBoundingClientRect().left
+        : 0;
+    const meldSpacing = openTiles.length ? 2 * tileWidth : 0;
+    const thirteenTileWidth = closedHandWidth + meldSpacing + openGroupWidth;
+    const targetHandLeft = targetCenter - thirteenTileWidth / 2 - marginLeft;
+    const handOffset = Math.max(0, targetHandLeft - handBaseLeft);
     hand.style.marginLeft = `${handOffset}px`;
-    const handMaxWidth = Math.max(0, timerRect.left - rowRect.left - handOffset - buttonWidth - gap);
+    const handMaxWidth = Math.max(0, timerRect.left - handBaseLeft - handOffset - gap);
     hand.style.maxWidth = `${handMaxWidth}px`;
 
     if (!_actionBudgetMeasureContext) {
