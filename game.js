@@ -192,8 +192,8 @@ function canPossiblyExtract(hand, required) {
     return (needPr + needFa + needAn) <= (pool["P（ｼﾞｮｰｶｰ）"] || 0);
 }
 
-function scoreHand(units, hand, openTiles, agariTile, isClosed, isRiichi, isTsumo, isDealer) {
-    return calculateMahjongScore(units, hand, openTiles || [], agariTile, isClosed, isRiichi, isTsumo, isDealer, OFFICIAL_UNITS);
+function scoreHand(units, hand, openTiles, agariTile, isClosed, isRiichi, isTsumo, isDealer, pIdx = null) {
+    return calculateMahjongScore(units, hand, openTiles || [], agariTile, isClosed, isRiichi, isTsumo, isDealer, OFFICIAL_UNITS, playerFavorites[pIdx] || null);
 }
 
 function tileFillsReq(tile, req) {
@@ -341,7 +341,7 @@ function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore =
         const res = checkPlayerAgari(concealedHand.concat(tile), pIdx, memo);
         if (!res.isValid) continue;
         if (withScore) {
-            const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, isRiichi, false, isDealer);
+            const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, isRiichi, false, isDealer, pIdx);
             if (score.han > 0) {
                 waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
             }
@@ -534,6 +534,7 @@ let hostConn = null, clientConns = []; let playerRoles = [];
 let playerConns = [null, null, null, null];
 let hostSeat = 0;
 let clientNamesMap = {}; let globalPlayerNames = [];
+let clientFavoritesMap = {}; let playerFavorites = [null, null, null, null];
 let deck = [], playerHands = [[],[],[],[]], discards = [[],[],[],[]];
 let currentTurn = 0, currentDiscard = null, nakiResponses = [], nakiTimer = null;
 let currentTurnHasDrawn = false;
@@ -577,6 +578,35 @@ const DISCARD_LIMIT_SEC = 20;
 function setConnStatus(msg) {
     const el = document.getElementById('conn-status');
     if (el) el.innerText = msg || '';
+}
+function isIdolTile(tile) {
+    return IDOLS.Princess.includes(tile) || IDOLS.Fairy.includes(tile) || IDOLS.Angel.includes(tile);
+}
+function selectedFavoriteIdol() {
+    const select = document.getElementById('favorite-idol-select');
+    return select && isIdolTile(select.value) ? select.value : null;
+}
+function requireFavoriteIdol() {
+    if (selectedFavoriteIdol()) return true;
+    setConnStatus('入室前に担当アイドルを選択してください');
+    const select = document.getElementById('favorite-idol-select');
+    if (select) select.focus();
+    return false;
+}
+function populateFavoriteIdolSelector() {
+    const select = document.getElementById('favorite-idol-select');
+    if (!select) return;
+    for (const [attribute, idols] of Object.entries(IDOLS)) {
+        const group = document.createElement('optgroup');
+        group.label = attribute;
+        idols.forEach(idol => {
+            const option = document.createElement('option');
+            option.value = idol;
+            option.innerText = idol;
+            group.appendChild(option);
+        });
+        select.appendChild(group);
+    }
 }
 function showWaitOverlay(msg) {
     const ov = document.getElementById('wait-overlay');
@@ -665,7 +695,7 @@ function evaluateAgari(pIdx, fullHand, agariTile, isTsumo) {
     if (!res.isValid) return null;
     const isClosed = openTiles[pIdx].length === 0;
     const isDealer = (pIdx === currentDealer);
-    const scoreInfo = scoreHand(res.units, fullHand, openTiles[pIdx], agariTile, isClosed, playerRiichi[pIdx], isTsumo, isDealer);
+    const scoreInfo = scoreHand(res.units, fullHand, openTiles[pIdx], agariTile, isClosed, playerRiichi[pIdx], isTsumo, isDealer, pIdx);
     if (scoreInfo.han <= 0) return null;
     return { res, scoreInfo };
 }
@@ -875,6 +905,7 @@ function discardFromHand(tile) {
 }
 
 function createRoom() {
+    if (!requireFavoriteIdol()) return;
     isHost = true;
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     setConnStatus('部屋を作成しています...');
@@ -893,6 +924,7 @@ function createRoom() {
     peer.on('connection', conn => attachClientConn(conn));
 }
 function joinRoom() {
+    if (!requireFavoriteIdol()) return;
     const roomId = (document.getElementById('join-id').value || '').trim();
     if (!roomId) { setConnStatus('部屋番号を入力してください'); return; }
     setConnStatus('接続しています...');
@@ -908,7 +940,7 @@ function joinRoom() {
             document.getElementById('setup-panel').style.display = 'none';
             showWaitOverlay('ホストの試合開始を待っています...');
             logM('ホストに接続しました');
-            hostConn.send({ type: 'SET_NAME', name: document.getElementById('player-name-input').value || 'ゲスト' });
+            hostConn.send({ type: 'SET_NAME', name: document.getElementById('player-name-input').value || 'ゲスト', favoriteIdol: selectedFavoriteIdol() });
         });
         hostConn.on('data', data => handleHostMsg(data));
         hostConn.on('close', () => {
@@ -928,18 +960,20 @@ function shuffleSeats(arr) {
 }
 
 function initMatch() {
+    if (!requireFavoriteIdol()) return;
     gameRuleMaxRounds = parseInt(document.getElementById('game-rule').value);
     currentBakaze = 0; currentKyoku = 1; currentDealer = 0; playerScores = [25000, 25000, 25000, 25000];
     riichiSticks = 0;
-    const slots = [{ role: 'HOST', conn: null, name: document.getElementById('player-name-input').value || 'ホスト' }];
+    const slots = [{ role: 'HOST', conn: null, name: document.getElementById('player-name-input').value || 'ホスト', favoriteIdol: selectedFavoriteIdol() }];
     clientConns.forEach(c => {
-        if (c && c.open) slots.push({ role: 'CLIENT', conn: c, name: clientNamesMap[c.peer] || 'ゲスト' });
+        if (c && c.open) slots.push({ role: 'CLIENT', conn: c, name: clientNamesMap[c.peer] || 'ゲスト', favoriteIdol: clientFavoritesMap[c.peer] || null });
     });
-    while (slots.length < 4) slots.push({ role: 'CPU', conn: null, name: 'CPU' + slots.length });
+    while (slots.length < 4) slots.push({ role: 'CPU', conn: null, name: 'CPU' + slots.length, favoriteIdol: null });
     shuffleSeats(slots);
     playerRoles = slots.map(s => s.role);
     playerConns = slots.map(s => s.conn);
     globalPlayerNames = slots.map(s => s.name);
+    playerFavorites = slots.map(s => s.favoriteIdol);
     hostSeat = playerRoles.indexOf('HOST');
     if (hostSeat < 0) hostSeat = 0;
     startKyoku();
@@ -960,7 +994,7 @@ function startKyoku() {
     clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
     
     playerRoles.forEach((role, idx) => {
-        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
+        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, favorites: playerFavorites, handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
         if(role === 'HOST') handleHostMsg(msg);
         else if(role === 'CLIENT') sendToClient(idx, msg);
     });
@@ -991,7 +1025,11 @@ function nextTurn() {
 }
 
 function handleClientMsg(conn, data) {
-    if(data.type === 'SET_NAME') { clientNamesMap[conn.peer] = data.name; return; }
+    if(data.type === 'SET_NAME') {
+        clientNamesMap[conn.peer] = data.name;
+        clientFavoritesMap[conn.peer] = isIdolTile(data.favoriteIdol) ? data.favoriteIdol : null;
+        return;
+    }
     if(data.type === 'READY_NEXT') { handleReadyNext(); return; }
     
     let pIdx = playerConns.indexOf(conn);
@@ -1956,7 +1994,9 @@ function handleHostMsg(data) {
         hideWaitOverlay();
         const dov = document.getElementById('disconnect-overlay');
         if (dov) dov.style.display = 'none';
-        globalPlayerNames = data.names; document.getElementById('result-overlay').style.display = 'none';
+        globalPlayerNames = data.names;
+        playerFavorites = data.favorites || [null, null, null, null];
+        document.getElementById('result-overlay').style.display = 'none';
         myId = data.pId; myLocalHand = data.hand; roleMap = data.roles; lockedUnits.clear(); completedNakiUnits.clear(); currentLockedIndices.clear();
         currentDealer = data.dealer;
         clientCurrentTurn = data.dealer;
@@ -1999,7 +2039,7 @@ function handleHostMsg(data) {
         if(agariCheck.isValid) { 
             let isClosed = (globalOpenTiles[myId] || []).length === 0;
             let isDealer = (myId === currentDealer);
-            let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], true, isDealer);
+            let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], true, isDealer, myId);
             
             if (scoreInfo.han > 0) {
                 document.getElementById('action-bar').style.display = 'flex'; 
@@ -2079,7 +2119,7 @@ function handleHostMsg(data) {
             if (agariCheck.isValid) {
                 let isClosed = (globalOpenTiles[myId] || []).length === 0;
                 let isDealer = (myId === currentDealer);
-                let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], false, isDealer);
+                let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], data.tile, isClosed, globalPlayerRiichi[myId], false, isDealer, myId);
                 if (scoreInfo.han > 0) canRon = true;
             }
             if (canRon && clientIsFuriten()) canRon = false;
@@ -2139,7 +2179,7 @@ function handleHostMsg(data) {
         if(agariCheck.isValid) { 
             let isClosed = (globalOpenTiles[myId] || []).length === 0;
             let isDealer = (myId === currentDealer);
-            let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], null, isClosed, globalPlayerRiichi[myId], false, isDealer);
+            let scoreInfo = scoreHand(agariCheck.units, fullHand, globalOpenTiles[myId] || [], null, isClosed, globalPlayerRiichi[myId], false, isDealer, myId);
             
             if (scoreInfo.han > 0) {
                 document.getElementById('action-bar').style.display = 'flex'; 
@@ -2308,6 +2348,7 @@ function syncAppViewport() {
     document.documentElement.style.setProperty('--app-h', `${height}px`);
     requestAnimationFrame(layoutTable);
 }
+populateFavoriteIdolSelector();
 syncAppViewport();
 window.addEventListener('resize', syncAppViewport);
 window.addEventListener('orientationchange', () => setTimeout(syncAppViewport, 200));

@@ -64,7 +64,7 @@ function unitComboFu(len, isOpen) {
     return isOpen ? 16 : 32;
 }
 
-function calculateMahjongScore(units, hand, a, b, c, d, e, f, g) {
+function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile) {
     let openTiles = [];
     let agariTile = null;
     let isClosed, isRiichi, isTsumo, isDealer, official;
@@ -144,6 +144,11 @@ function calculateMahjongScore(units, hand, a, b, c, d, e, f, g) {
         });
         fu += comboFu;
         details.push(`その他の構成 ${comboLabel} → ${comboFu}符`);
+    }
+
+    if (oshiTile && (hand || []).includes(oshiTile)) {
+        han += 1;
+        details.push(`担当アイドル ${oshiTile} (1翻)`);
     }
 
     fu = Math.ceil(fu / 10) * 10;
