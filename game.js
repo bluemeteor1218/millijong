@@ -36,8 +36,6 @@ function layoutTable() {
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const root = document.documentElement;
-    const playerDock = document.getElementById('player-dock');
-    if (playerDock) root.style.setProperty('--player-dock-height', `${playerDock.offsetHeight}px`);
     const isPortrait = height > width;
     const isCompactLandscape = !isPortrait && height < 480;
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
@@ -1985,7 +1983,7 @@ function startDecisionTimer(label, onExpire, isNakiDecision = false) {
         activeDecisionTimer = null;
         if (budget) {
             budget.innerText = '';
-            budget.style.display = 'none';
+            budget.style.visibility = 'hidden';
         }
         return;
     }
@@ -2000,7 +1998,7 @@ function startDecisionTimer(label, onExpire, isNakiDecision = false) {
         if (!activeDecisionTimer) return;
         const elapsed = (Date.now() - activeDecisionTimer.startedAt) / 1000;
         if (budget) {
-            budget.style.display = 'block';
+            budget.style.visibility = 'visible';
             if (activeDecisionTimer.fixedNakiLimit) {
                 budget.innerText = `0秒＋${Math.max(0, Math.ceil(activeDecisionTimer.basicSeconds - elapsed))}秒`;
             } else {
@@ -2451,7 +2449,7 @@ function renderHand(isMyTurn) {
 function hideActions() { 
     clearInterval(actionTimerInterval); 
     document.getElementById('action-budget').innerText = '';
-    document.getElementById('action-budget').style.display = 'none';
+    document.getElementById('action-budget').style.visibility = 'hidden';
     document.getElementById('action-bar').style.display = 'none'; 
     document.getElementById('btn-tsumo').style.display = 'none'; 
     document.getElementById('btn-ron').style.display = 'none'; 
