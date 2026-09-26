@@ -1651,14 +1651,16 @@ function settleRyukyokuAndEnd() {
     const scoresBefore = [...playerScores];
     const tenpai = [0, 1, 2, 3].map(i => isPlayerTenpai(i));
     const tCount = tenpai.filter(Boolean).length;
-    const nCount = 4 - tCount;
-    if (tCount > 0 && nCount > 0) {
-        const pay = Math.floor(3000 / nCount);
-        const get = Math.floor(3000 / tCount);
-        for (let i = 0; i < 4; i++) {
-            if (tenpai[i]) playerScores[i] += get;
-            else playerScores[i] -= pay;
-        }
+    const notenBappu = [
+        { notenPays: 0, tenpaiReceives: 0 },
+        { notenPays: 1000, tenpaiReceives: 3000 },
+        { notenPays: 1500, tenpaiReceives: 1500 },
+        { notenPays: 3000, tenpaiReceives: 1000 },
+        { notenPays: 0, tenpaiReceives: 0 }
+    ][tCount];
+    for (let i = 0; i < 4; i++) {
+        if (tenpai[i]) playerScores[i] += notenBappu.tenpaiReceives;
+        else playerScores[i] -= notenBappu.notenPays;
     }
     kyokuActive = false;
     bumpGameEpoch();
@@ -1767,6 +1769,8 @@ function advanceResultStage() {
         resultStage = 'transfer';
         document.getElementById('result-hand').style.display = 'none';
         document.getElementById('result-yaku').style.display = 'none';
+        document.getElementById('result-score-text').style.display = 'none';
+        document.getElementById('result-point-transfer').style.display = 'block';
         document.getElementById('btn-next-kyoku').innerText = '次へ進む';
         return;
     }
