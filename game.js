@@ -1960,15 +1960,35 @@ const MAX_IDOL_IMAGE_LOADS = 4;
 
 function revealTileImage(image, fallback, src) {
     image.onload = () => {
-        const reveal = () => {
+        const revealImage = () => {
             image.style.visibility = 'visible';
+            image.style.display = '';
             fallback.style.display = 'none';
         };
-        if (typeof image.decode === 'function') image.decode().then(reveal).catch(() => { image.style.display = 'none'; });
-        else reveal();
+        const revealFallback = () => {
+            image.style.display = 'none';
+            image.style.visibility = 'hidden';
+            fallback.style.display = '';
+        };
+        if (image.naturalWidth <= 0) {
+            revealFallback();
+        } else if (typeof image.decode === 'function') {
+            image.decode().then(revealImage).catch(() => {
+                if (image.naturalWidth > 0) revealImage();
+                else revealFallback();
+            });
+        } else {
+            revealImage();
+        }
     };
-    image.onerror = () => { image.style.display = 'none'; fallback.style.display = ''; };
+    image.onerror = () => {
+        image.style.display = 'none';
+        image.style.visibility = 'hidden';
+        fallback.style.display = '';
+    };
+    fallback.style.display = '';
     image.style.display = '';
+    image.style.visibility = 'hidden';
     image.src = src;
     if (image.complete && image.naturalWidth > 0) image.onload();
 }
@@ -1995,10 +2015,7 @@ function pumpIdolImageQueue() {
             });
             pumpIdolImageQueue();
         };
-        loader.onload = () => {
-            if (typeof loader.decode === 'function') loader.decode().then(() => finish(true)).catch(() => finish(false));
-            else finish(true);
-        };
+        loader.onload = () => finish(loader.naturalWidth > 0);
         loader.onerror = () => finish(false);
         state.timeout = setTimeout(() => finish(false), 10000);
         loader.src = state.srcPath;
@@ -2011,7 +2028,12 @@ function requestIdolImage(image, fallback, tileName) {
         revealTileImage(image, fallback, state.src);
         return;
     }
-    if (state && state.status === 'failed') return;
+    if (state && state.status === 'failed') {
+        image.style.display = 'none';
+        image.style.visibility = 'hidden';
+        fallback.style.display = '';
+        return;
+    }
     if (!state) {
         state = { status: 'queued', srcPath: `idol_images/${encodeURIComponent(tileName)}.png`, src: '', listeners: [] };
         idolImageStates.set(tileName, state);
