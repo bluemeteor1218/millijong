@@ -163,7 +163,7 @@
         
         .river-area { position: absolute; width: calc(var(--river-tile-w) * 6 + 10px); display: grid; grid-template-columns: repeat(6, var(--river-tile-w)); grid-template-rows: repeat(3, var(--river-tile-h)); grid-auto-rows: var(--river-tile-h); align-content: start; justify-content: start; gap: 2px; z-index: 5; pointer-events: none;}
         .river-area .mahjong-tile { width: var(--river-tile-w); height: var(--river-tile-h); margin: 0; }
-        .river-area .mahjong-tile.riichi-discard { width: var(--river-tile-h); height: var(--river-tile-w); justify-self: center; align-self: center; }
+        .river-area .mahjong-tile.riichi-discard { width: var(--river-tile-h); height: var(--river-tile-w); justify-self: center; align-self: center; transform: rotate(-90deg); transform-origin: center; }
         
         #river-0 { top: 68%; left: 50%; transform: translateX(-50%); }
         #river-2 { top: 13%; left: 50%; transform: translateX(-50%) rotate(180deg); }
@@ -257,6 +257,12 @@
         #result-hand .mahjong-tile { width: clamp(24px, 5vw, 40px); height: clamp(34px, 7vw, 56px); font-size: 14px; box-shadow: none; border-color: #555; margin: 0;}
         .result-details { font-size: clamp(14px, 4vw, 20px); line-height: 1.6; }
         .result-score { font-size: clamp(24px, 6vw, 40px); color: #ffeb3b; font-weight: bold; margin-top: 10px; text-shadow: 2px 2px 4px #000;}
+        .result-transfer { width: min(92vw, 540px); margin: 12px 0; }
+        .result-transfer-title { margin-bottom: 10px; font-size: 20px; font-weight: bold; color: #ffeb3b; }
+        .result-transfer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.2); text-align: right; }
+        .result-transfer-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+        .result-transfer-delta { min-width: 5em; font-weight: bold; color: #ffeb3b; }
+        .result-transfer-note { margin-top: 12px; color: #ddd; font-size: 14px; }
 
         /* モバイル向け追加調整 */
         #wait-overlay, #disconnect-overlay {
@@ -435,7 +441,8 @@
         <div id="result-hand"></div>
         <div class="result-details" id="result-yaku"></div>
         <div class="result-score" id="result-score-text"></div>
-        <button class="btn" id="btn-next-kyoku" style="display:none; margin-top: 20px; font-size: 16px; padding: 10px 30px;" onclick="sendReadyNext()">次へ進む</button>
+        <div class="result-transfer" id="result-point-transfer" style="display:none;"></div>
+        <button class="btn" id="btn-next-kyoku" style="display:none; margin-top: 20px; font-size: 16px; padding: 10px 30px;" onclick="advanceResultStage()">点数移動を見る</button>
         <div id="next-kyoku-msg" style="display:none; margin-top: 20px; font-size: 16px; color: #aaa;">他プレイヤーの確認を待っています...</div>
         <button class="btn" id="btn-endmatch" style="display:none; margin-top: 30px; background: #fff; color: #333;" onclick="location.reload();">タイトルへ戻る</button>
     </div>

@@ -264,7 +264,7 @@ function candidateWaitTiles(hand) {
     return [...cands];
 }
 
-function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore = false) {
+function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore = false, isRiichi = false) {
     let waits = [];
     let isDealer = (pIdx === currentDealer);
     const concealedHand = testHand.slice(0, Math.max(0, testHand.length - openTilesArr.length));
@@ -275,7 +275,7 @@ function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore =
         const res = checkPlayerAgari(concealedHand.concat(tile), pIdx, memo);
         if (!res.isValid) continue;
         if (withScore) {
-            const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, false, false, isDealer);
+            const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, isRiichi, false, isDealer);
             if (score.han > 0) {
                 waits.push({ tile: tile, units: res.units, han: score.han, fu: score.fu, rank: score.rank, scoreVal: score.score });
             }
@@ -286,7 +286,7 @@ function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore =
     return waits;
 }
 
-function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx, withScore = false) {
+function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx, withScore = false, isRiichi = false) {
     const fullHand = myHand.concat(myOpen);
     const tenpaiList = [];
     const globalMemo = {};
@@ -305,11 +305,11 @@ function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx, withScore = false) {
             const discardTile = uniqueHand[d];
             const testHand = fullHand.slice();
             testHand.splice(testHand.indexOf(discardTile), 1);
-            const waits = getWaits(testHand, globalMemo, isClosed, pIdx, myOpen, withScore);
+            const waits = getWaits(testHand, globalMemo, isClosed, pIdx, myOpen, withScore, isRiichi);
             if (waits.length > 0) tenpaiList.push({ discard: discardTile, waits: waits });
         }
     } else {
-        const waits = getWaits(fullHand, globalMemo, isClosed, pIdx, myOpen, withScore);
+        const waits = getWaits(fullHand, globalMemo, isClosed, pIdx, myOpen, withScore, isRiichi);
         if (waits.length > 0) tenpaiList.push({ discard: null, waits: waits });
     }
     return tenpaiList;
@@ -1169,6 +1169,9 @@ function processAgari(pIdx, isTsumo) {
     if (!evaluated) return false;
     let res = evaluated.res;
     let scoreInfo = evaluated.scoreInfo;
+    const scoresBefore = [...playerScores];
+    const riichiSticksAwarded = riichiSticks;
+    const isDealer = pIdx === currentDealer;
     {
 
         if (isTsumo) {
@@ -1198,7 +1201,7 @@ function processAgari(pIdx, isTsumo) {
         
         kyokuActive = false;
         bumpGameEpoch();
-        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score: legacyScoreObj, scores: playerScores, riichiSticks: riichiSticks, units: res.units });
+        broadcast({ type: 'KYOKU_OVER', isRyukyoku: false, pIdx, isTsumo, hand: fullHand, score: legacyScoreObj, scores: playerScores, scoresBefore, riichiSticks: riichiSticks, riichiSticksAwarded, units: res.units });
         prepareNextKyoku(pIdx === currentDealer);
         return true;
     }
@@ -1210,6 +1213,7 @@ function isPlayerTenpai(pIdx) {
 }
 
 function settleRyukyokuAndEnd() {
+    const scoresBefore = [...playerScores];
     const tenpai = [0, 1, 2, 3].map(i => isPlayerTenpai(i));
     const tCount = tenpai.filter(Boolean).length;
     const nCount = 4 - tCount;
@@ -1233,6 +1237,7 @@ function settleRyukyokuAndEnd() {
         isRyukyoku: true,
         msg: '流局です',
         scores: playerScores,
+        scoresBefore,
         riichiSticks: riichiSticks,
         tenpai,
         ryukyokuLines: lines,
@@ -1251,6 +1256,77 @@ function prepareNextKyoku(renchan) {
     
     let humanCount = playerRoles.filter(r => r !== 'CPU').length;
     if (humanCount <= 0) { setTimeout(proceedToNextKyoku, 2000); }
+}
+
+let resultStage = 'details';
+function resetResultStage() {
+    resultStage = 'details';
+    document.getElementById('result-hand').style.display = '';
+    document.getElementById('result-yaku').style.display = '';
+    document.getElementById('result-score-text').style.display = '';
+    document.getElementById('result-point-transfer').style.display = 'none';
+    const button = document.getElementById('btn-next-kyoku');
+    button.innerText = '点数移動を見る';
+    button.onclick = advanceResultStage;
+}
+
+function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
+    const panel = document.getElementById('result-point-transfer');
+    panel.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'result-transfer-title';
+    title.innerText = '点数移動';
+    panel.appendChild(title);
+
+    const header = document.createElement('div');
+    header.className = 'result-transfer-row';
+    header.style.color = '#bbb';
+    header.innerHTML = '<span></span><span>移動前</span><span>移動後</span><span>増減</span>';
+    panel.appendChild(header);
+
+    for (let i = 0; i < 4; i++) {
+        const before = Number((scoresBefore || scoresAfter)[i] || 0);
+        const after = Number(scoresAfter[i] || 0);
+        const delta = after - before;
+        const row = document.createElement('div');
+        row.className = 'result-transfer-row';
+
+        const name = document.createElement('span');
+        name.className = 'result-transfer-name';
+        name.innerText = globalPlayerNames[i] || `プレイヤー${i + 1}`;
+        const beforeValue = document.createElement('span');
+        beforeValue.innerText = `${before.toLocaleString('ja-JP')}点`;
+        const afterValue = document.createElement('span');
+        afterValue.innerText = `${after.toLocaleString('ja-JP')}点`;
+        const deltaValue = document.createElement('span');
+        deltaValue.className = 'result-transfer-delta';
+        deltaValue.style.color = delta > 0 ? '#81c784' : delta < 0 ? '#ef9a9a' : '#ddd';
+        deltaValue.innerText = `${delta > 0 ? '+' : ''}${delta.toLocaleString('ja-JP')}点`;
+
+        row.append(name, beforeValue, afterValue, deltaValue);
+        panel.appendChild(row);
+    }
+
+    if (note) {
+        const noteElement = document.createElement('div');
+        noteElement.className = 'result-transfer-note';
+        noteElement.innerText = note;
+        panel.appendChild(noteElement);
+    }
+}
+
+function advanceResultStage() {
+    if (resultStage === 'details') {
+        resultStage = 'transfer';
+        document.getElementById('result-hand').style.display = 'none';
+        document.getElementById('result-yaku').style.display = 'none';
+        document.getElementById('result-score-text').style.display = 'none';
+        document.getElementById('result-point-transfer').style.display = 'block';
+        document.getElementById('btn-next-kyoku').innerText = '次へ進む';
+        return;
+    }
+    sendReadyNext();
 }
 
 function handleReadyNext() {
@@ -1518,7 +1594,17 @@ function updateProgressUI() {
         if(discards[i]) visibleTiles.push(...discards[i]);
     }
 
-    let tenpaiInfo = [];
+    const openTiles = globalOpenTiles[myId] || [];
+    const riichiTurn = !!globalPlayerRiichi[myId] && isMyTurnNow;
+    const navHand = riichiTurn ? myLocalHand.slice(0, -1) : myLocalHand;
+    const tenpaiInfo = getTenpaiInfo(
+        navHand,
+        openTiles,
+        isMyTurnNow && !globalPlayerRiichi[myId],
+        myId,
+        true,
+        !!globalPlayerRiichi[myId]
+    );
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
         tenpaiDiv.style.marginBottom = '15px';
@@ -2003,6 +2089,7 @@ function handleHostMsg(data) {
     if(data.type === 'KYOKU_OVER') {
         hideActions(); updateScores(data.scores); document.getElementById('action-status').style.visibility = 'hidden';
         document.getElementById('btn-endmatch').style.display = 'none';
+        resetResultStage();
         
         if (data.isRyukyoku) {
             document.getElementById('result-winner').innerText = `流局`; 
@@ -2013,6 +2100,9 @@ function handleHostMsg(data) {
             const ren = data.dealerRenchan ? '<br>親テンパイのため連荘' : '';
             document.getElementById('result-yaku').innerHTML = extra + ren; 
             document.getElementById('result-score-text').innerText = ''; 
+            const sticks = data.riichiSticks || 0;
+            const note = sticks ? `供託 ${sticks} 本は次局へ持ち越し` : '';
+            renderPointTransfer(data.scoresBefore, data.scores, note);
             document.getElementById('btn-next-kyoku').style.display = 'inline-block';
             document.getElementById('next-kyoku-msg').style.display = 'none';
             document.getElementById('result-overlay').style.display = 'flex';
@@ -2045,6 +2135,9 @@ function handleHostMsg(data) {
 
                 document.getElementById('result-yaku').innerHTML = data.score.details.join('<br>'); 
                 document.getElementById('result-score-text').innerText = `${data.score.rank} ${data.score.score}点`; 
+                const sticks = data.riichiSticksAwarded || 0;
+                const note = sticks ? `供託 ${sticks} 本（${(sticks * 1000).toLocaleString('ja-JP')}点）は和了者が獲得` : '';
+                renderPointTransfer(data.scoresBefore, data.scores, note);
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
                 document.getElementById('result-overlay').style.display = 'flex';
@@ -2053,6 +2146,7 @@ function handleHostMsg(data) {
     }
 
     if(data.type === 'MATCH_OVER') {
+        resetResultStage();
         document.getElementById('result-winner').innerText = data.reason === 'tobi' ? '飛び終了！' : '試合終了！';
         document.getElementById('result-hand').innerHTML = '';
         let rankHtml = "最終スコア<br><br>";
