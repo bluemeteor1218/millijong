@@ -14,10 +14,10 @@
            レスポンシブ用 変数定義（縦画面・横画面での最適化）
            ========================================= */
         :root {
-            --river-tile-w: clamp(20px, 4.4vmin, 39px);
-            --river-tile-h: clamp(28px, 6.1vmin, 53px);
-            --hand-tile-w: clamp(24px, 4.7vmin, 39px);
-            --hand-tile-h: clamp(35px, 6.5vmin, 55px);
+            --river-tile-w: clamp(18px, min(7.5cqh, 4.3cqw), 48px);
+            --river-tile-h: clamp(26px, min(10cqh, 5.6cqw), 64px);
+            --hand-tile-w: clamp(30px, 5.6vmin, 48px);
+            --hand-tile-h: clamp(43px, 7.5vmin, 64px);
             --other-tile-w: clamp(21px, 4.5vmin, 40px);
             --other-tile-h: clamp(29px, 6.3vmin, 55px);
             --tile-depth: clamp(4px, 0.7vmin, 6px);
@@ -29,11 +29,11 @@
         @media screen and (max-aspect-ratio: 1/1) {
             :root {
                 --table-tilt: 26deg;
-                --center-scale: 0.82;
+                --center-scale: 0.80;
                 --other-tile-w: clamp(17px, 4.3vmin, 32px);
                 --other-tile-h: clamp(25px, 5.9vmin, 45px);
-                --river-tile-w: clamp(16px, 4.1vmin, 31px);
-                --river-tile-h: clamp(24px, 5.7vmin, 44px);
+                --river-tile-w: clamp(16px, min(6.2cqh, 7.2cqw), 36px);
+                --river-tile-h: clamp(24px, min(8cqh, 9.5cqw), 48px);
             }
         }
         /* 横画面 (PC、スマホ横持ち等) */
@@ -41,6 +41,14 @@
             :root {
                 --table-tilt: 28deg;
                 --center-scale: 0.86;
+            }
+        }
+        @media screen and (orientation: landscape) and (max-width: 900px) {
+            :root {
+                --table-tilt: 24deg;
+                --center-scale: 0.80;
+                --other-tile-w: clamp(20px, 6vmin, 30px);
+                --other-tile-h: clamp(28px, 8.5vmin, 42px);
             }
         }
 
@@ -77,7 +85,7 @@
         #game-board { flex: 1; position: relative; overflow: hidden; background:
             radial-gradient(ellipse at 50% 0%, #3a2a1c 0%, #1a120c 55%, #0d0a08 100%);
             display: flex; flex-direction: column; touch-action: none; overscroll-behavior: none; }
-        #table-area { flex: 1 1 auto; position: relative; min-height: 0; overflow: hidden;
+        #table-area { flex: 1 1 auto; position: relative; min-height: 0; overflow: hidden; container-type: size;
             perspective: 1600px; perspective-origin: 50% 52%; }
         #table-3d {
             position: absolute; left: -8%; right: -8%; top: -8%; bottom: -4%;
@@ -136,7 +144,7 @@
         
         /* 自分の手牌 */
         #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; align-items: flex-end; gap: 2px; padding: 14px 0 8px; width: max-content; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
-        #my-hand-area .mahjong-tile { width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px 2px; }
+        #my-hand-area .mahjong-tile { flex: 0 0 auto; width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px 2px; }
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
         #my-hand-area .tile-text { font-size: clamp(12px, 1.8vmin, 16px); }
@@ -144,22 +152,44 @@
         
         /* 他家の手牌 */
         .opponent-seat { position: absolute; display: flex; align-items: center; gap: 10px; pointer-events: none; z-index: 6; transform-style: preserve-3d; }
-        #seat-1 { top: 50%; left: 88%; transform: translate(-50%, -50%) rotate(-90deg); }
+        #seat-1 { top: 50%; left: 87%; transform: translate(-50%, -50%) rotate(-90deg); }
         #seat-2 { top: 6%; left: 50%; transform: translate(-50%, 0) rotate(180deg); }
-        #seat-3 { top: 50%; left: 12%; transform: translate(-50%, -50%) rotate(90deg); }
+        #seat-3 { top: 50%; left: 13%; transform: translate(-50%, -50%) rotate(90deg); }
         .other-hand, .meld-area { position: relative; display: flex; flex: 0 0 auto; gap: 3px; transform-style: preserve-3d; }
         .other-hand .mahjong-tile { margin: 0; }
         
         .meld-area .mahjong-tile { transform: none; }
         
-        .river-area { position: absolute; width: calc(var(--river-tile-w) * 6 + 10px); display: grid; grid-template-columns: repeat(6, var(--river-tile-w)); grid-auto-rows: var(--river-tile-h); align-content: start; justify-content: start; gap: 2px; z-index: 5; pointer-events: none;}
+        .river-area { position: absolute; width: calc(var(--river-tile-w) * 6 + 10px); display: grid; grid-template-columns: repeat(6, var(--river-tile-w)); grid-template-rows: repeat(3, var(--river-tile-h)); grid-auto-rows: var(--river-tile-h); align-content: start; justify-content: start; gap: 2px; z-index: 5; pointer-events: none;}
         .river-area .mahjong-tile { width: var(--river-tile-w); height: var(--river-tile-h); margin: 0; }
         .river-area .mahjong-tile.riichi-discard { width: var(--river-tile-h); height: var(--river-tile-w); justify-self: center; align-self: center; }
         
         #river-0 { top: 68%; left: 50%; transform: translateX(-50%); }
-        #river-2 { top: 25%; left: 50%; transform: translateX(-50%) rotate(180deg); }
-        #river-1 { left: 76%; top: 50%; transform: translate(-50%, -50%) rotate(-90deg); }
-        #river-3 { left: 24%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); }
+        #river-2 { top: 13%; left: 50%; transform: translateX(-50%) rotate(180deg); }
+        #river-1 { left: 73%; top: 50%; transform: translate(-50%, -50%) rotate(-90deg); }
+        #river-3 { left: 27%; top: 50%; transform: translate(-50%, -50%) rotate(90deg); }
+
+        @media screen and (max-aspect-ratio: 1/1) {
+            .river-area#river-1, .river-area#river-3 {
+                width: calc(var(--river-tile-w) * 18 + 34px);
+                grid-template-columns: repeat(18, var(--river-tile-w));
+                grid-template-rows: var(--river-tile-h);
+            }
+            #river-1 { left: 76%; }
+            #river-3 { left: 24%; }
+            #seat-1 { left: 88%; }
+            #seat-3 { left: 12%; }
+        }
+
+        @media screen and (orientation: landscape) and (max-width: 900px) {
+            .river-area#river-0, .river-area#river-2 {
+                width: calc(var(--river-tile-w) * 18 + 34px);
+                grid-template-columns: repeat(18, var(--river-tile-w));
+                grid-template-rows: var(--river-tile-h);
+            }
+            #river-0 { top: 78%; left: 45%; direction: rtl; }
+            #river-2 { top: 17%; left: 47%; }
+        }
         
         #center-status { position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%) scale(var(--center-scale));
@@ -246,8 +276,8 @@
 
         @media (pointer: coarse) {
             :root {
-                --hand-tile-w: clamp(19px, 4.8vw, 32px);
-                --hand-tile-h: clamp(27px, 6.7vw, 45px);
+                --hand-tile-w: clamp(28px, 8.5vmin, 38px);
+                --hand-tile-h: clamp(40px, 12vmin, 52px);
             }
             .btn { font-size: 15px; }
             #center-status { min-width: min(220px, 70vw); }
@@ -260,7 +290,7 @@
             #action-status { min-height: 0 !important; margin-bottom: 0 !important; }
         }
 
-        @media screen and (max-width: 800px) {
+        @media screen and (max-width: 900px) {
             #mobile-sidebar-toggle { display: block; top: calc(10px + env(safe-area-inset-top)); }
             #progress-sidebar { position: fixed; left: -100%; top: 0; height: 100vh; width: 280px; max-width: 80vw; transition: left 0.3s ease; box-shadow: none; padding-top: 50px; }
             #progress-sidebar.open { left: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.7); }

@@ -210,6 +210,15 @@ function checkAgari(hand, memo = {}) {
     return memo[key];
 }
 
+function checkPlayerAgari(concealedHand, pIdx, memo = {}) {
+    const result = checkAgari(concealedHand, memo);
+    if (!result.isValid) return result;
+    return {
+        isValid: true,
+        units: [...result.units, ...(globalOpenUnitNames[pIdx] || [])]
+    };
+}
+
 // 外部ファイル化したスコア計算をかませて、役（ハン）が1以上あるか確認する
 function candidateWaitTiles(hand) {
     const pool = Object.create(null);
@@ -258,11 +267,12 @@ function candidateWaitTiles(hand) {
 function getWaits(testHand, memo, isClosed, pIdx, openTilesArr = [], withScore = false) {
     let waits = [];
     let isDealer = (pIdx === currentDealer);
-    const waitTiles = candidateWaitTiles(testHand);
+    const concealedHand = testHand.slice(0, Math.max(0, testHand.length - openTilesArr.length));
+    const waitTiles = candidateWaitTiles(concealedHand);
     for (let t = 0; t < waitTiles.length; t++) {
         const tile = waitTiles[t];
         const tHand = testHand.concat(tile);
-        const res = checkAgari(tHand, memo);
+        const res = checkPlayerAgari(concealedHand.concat(tile), pIdx, memo);
         if (!res.isValid) continue;
         if (withScore) {
             const score = scoreHand(res.units, tHand, openTilesArr, tile, isClosed, false, false, isDealer);
@@ -281,7 +291,7 @@ function getTenpaiInfo(myHand, myOpen, isMyTurn, pIdx, withScore = false) {
     const tenpaiList = [];
     const globalMemo = {};
     const isClosed = myOpen.length === 0;
-    if (checkAgari(fullHand, globalMemo).isValid) return [];
+    if (checkPlayerAgari(myHand, pIdx, globalMemo).isValid) return [];
 
     if (isMyTurn) {
         const uniqueHand = [];
@@ -460,6 +470,7 @@ let hostSeat = 0;
 let clientNamesMap = {}; let globalPlayerNames = [];
 let deck = [], playerHands = [[],[],[],[]], discards = [[],[],[],[]];
 let currentTurn = 0, currentDiscard = null, nakiResponses = [], nakiTimer = null;
+let currentTurnHasDrawn = false;
 let isWaitingAction = false; let isMyTurnNow = false; 
 
 let gameRuleMaxRounds = 1; let currentBakaze = 0; let currentKyoku = 1; let currentDealer = 0;
@@ -471,6 +482,8 @@ let riichiDiscardIndex = [-1, -1, -1, -1];
 let globalHandLens = [12,12,12,12]; let getHandLens = () => playerHands.map(h => h.length);
 let openTiles = [[], [], [], []]; let getOpenTiles = () => openTiles;
 let globalOpenTiles = [[], [], [], []];
+let openUnitNames = [[], [], [], []];
+let globalOpenUnitNames = [[], [], [], []];
 let globalPlayerRiichi = [false, false, false, false];
 let globalRiichiSticks = 0;
 let globalRiichiDiscardIndex = [-1, -1, -1, -1];
@@ -537,6 +550,7 @@ function sendToClient(idx, data) {
     if (conn && conn.open) conn.send(data);
 }
 function broadcast(data) {
+    data.openUnitNames = openUnitNames.map(names => [...names]);
     const sent = new Set();
     playerConns.forEach(c => {
         if (c && c.open && !sent.has(c)) { c.send(data); sent.add(c); }
@@ -580,7 +594,8 @@ function onClientDisconnected(conn) {
 
 function evaluateAgari(pIdx, fullHand, agariTile, isTsumo) {
     const memo = {};
-    const res = checkAgari(fullHand, memo);
+    const concealedHand = isTsumo ? playerHands[pIdx] : [...playerHands[pIdx], agariTile];
+    const res = checkPlayerAgari(concealedHand, pIdx, memo);
     if (!res.isValid) return null;
     const isClosed = openTiles[pIdx].length === 0;
     const isDealer = (pIdx === currentDealer);
@@ -593,7 +608,7 @@ function getWaitTilesForPlayer(pIdx) {
     const closed = playerHands[pIdx];
     const opened = openTiles[pIdx] || [];
     const full = [...closed, ...opened];
-    if (checkAgari(full, {}).isValid) return [];
+    if (checkPlayerAgari(closed, pIdx, {}).isValid) return [];
     const waits = getWaits(full, {}, opened.length === 0, pIdx, opened);
     return waits.map(w => w.tile);
 }
@@ -611,7 +626,7 @@ function clientIsFuriten() {
     const closed = myLocalHand;
     const opened = globalOpenTiles[myId] || [];
     const full = [...closed, ...opened];
-    if (checkAgari(full, {}).isValid) return false;
+    if (checkPlayerAgari(closed, myId, {}).isValid) return false;
     const waits = getWaits(full, {}, opened.length === 0, myId, opened);
     const river = discards[myId] || [];
     return waits.some(w => river.includes(w.tile));
@@ -868,7 +883,7 @@ function initMatch() {
 function startKyoku() {
     bumpGameEpoch();
     kyokuActive = true;
-    deck = []; discards = [[],[],[],[]]; openTiles = [[],[],[],[]];
+    deck = []; discards = [[],[],[],[]]; openTiles = [[],[],[],[]]; openUnitNames = [[],[],[],[]];
     playerRiichi = [false, false, false, false]; riichiDiscardIndex = [-1, -1, -1, -1];
     skipFuriten = [false, false, false, false];
     for(let attr in IDOLS) IDOLS[attr].forEach(i => deck.push(i, i));
@@ -876,11 +891,11 @@ function startKyoku() {
     for(let i = deck.length-1; i>0; i--) { let j = Math.floor(Math.random()*(i+1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
 
     for(let i=0; i<4; i++) { playerHands[i] = deck.splice(-12); playerHands[i].sort((a, b) => (SORT_ORDER[a] ?? 999) - (SORT_ORDER[b] ?? 999)); }
-    isWaitingAction = false; currentTurn = currentDealer; 
+    isWaitingAction = false; currentTurn = currentDealer; currentTurnHasDrawn = false;
     clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
     
     playerRoles.forEach((role, idx) => {
-        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, handLens: getHandLens(), openTiles: getOpenTiles(), scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
+        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
         if(role === 'HOST') handleHostMsg(msg);
         else if(role === 'CLIENT') sendToClient(idx, msg);
     });
@@ -888,7 +903,7 @@ function startKyoku() {
 }
 
 function nextTurn() {
-    if (!kyokuActive) return;
+    if (!kyokuActive || currentTurnHasDrawn) return;
     isWaitingAction = false;
     skipFuriten[currentTurn] = playerRiichi[currentTurn] ? skipFuriten[currentTurn] : false;
     if(deck.length === 0) { 
@@ -897,6 +912,7 @@ function nextTurn() {
     }
     if(playerHands[currentTurn].length + openTiles[currentTurn].length >= 14) return;
 
+    currentTurnHasDrawn = true;
     let drawn = deck.pop(); playerHands[currentTurn].push(drawn);
     broadcast({ type: 'TURN_CHANGE', turn: currentTurn, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
     
@@ -1051,12 +1067,13 @@ function advanceTurnAfterDiscard() {
             else if (clerkState.firstNakiPlayer !== null) nextP = (clerkState.firstNakiPlayer + 1) % 4;
             else nextP = (clerkState.originalPlayer + 1) % 4;
             
-            clerkState.active = false; currentTurn = nextP; 
+            clerkState.active = false; currentTurn = nextP; currentTurnHasDrawn = false;
             kyokuTimeout(nextTurn, 1000); 
             return;
         }
     }
-    currentTurn = (currentDiscard.pIdx + 1) % 4; 
+    currentTurn = (currentDiscard.pIdx + 1) % 4;
+    currentTurnHasDrawn = false;
     kyokuTimeout(nextTurn, 1000); 
 }
 
@@ -1065,7 +1082,7 @@ function seatDistanceFromDiscarder(pIdx) {
 }
 
 function resolveActions() {
-    if (!currentDiscard) return;
+    if (!isWaitingAction || !currentDiscard) return;
     isWaitingAction = false; clearTimeout(nakiTimer);
     for(let i=0; i<4; i++) {
         if(i !== currentDiscard.pIdx && !nakiResponses.find(r => r.pIdx === i)) {
@@ -1103,6 +1120,7 @@ function resolveActions() {
 
             let usedTiles = consumeUnitFromHand(playerHands[nPlayer], nUnit, currentDiscard.tile);
             openTiles[nPlayer].push(...usedTiles);
+            openUnitNames[nPlayer].push(nUnit);
             discards[currentDiscard.pIdx].pop();
             
             broadcast({ type: 'DISCARD_REMOVED', pIdx: currentDiscard.pIdx, discards: discards, handLens: getHandLens(), openTiles: getOpenTiles(), playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex, scores: playerScores });
@@ -1110,7 +1128,7 @@ function resolveActions() {
             broadcast({ type: 'ACTION_TOAST', text: 'スカウト！', actionType: 'scout' });
             broadcast({ type: 'MSG', msg: `${globalPlayerNames[nPlayer]} がスカウトしました` });
 
-            currentTurn = nPlayer;
+            currentTurn = nPlayer; currentTurnHasDrawn = true;
             broadcast({ type: 'TURN_CHANGE', turn: currentTurn, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
             
             let msg = { type: 'NAKI_TURN', hand: [...playerHands[currentTurn]], unitName: nUnit };
@@ -1469,7 +1487,7 @@ function getRemaining(req, visibleTiles) {
 let _progressKey = '';
 let _progressTimer = null;
 function scheduleProgressUI() {
-    const key = myLocalHand.join(',') + '|' + (globalOpenTiles[myId] || []).join(',') + '|' + useAlmForProgress;
+    const key = myLocalHand.join(',') + '|' + (globalOpenTiles[myId] || []).join(',') + '|' + [...lockedUnits].sort().join(',') + '|' + useAlmForProgress;
     if (key === _progressKey) return;
     clearTimeout(_progressTimer);
     _progressTimer = setTimeout(() => {
@@ -1746,6 +1764,7 @@ function autoDiscard() {
 function handleHostMsg(data) {
     if (data.handLens) globalHandLens = data.handLens;
     if (data.openTiles) globalOpenTiles = data.openTiles;
+    if (data.openUnitNames) globalOpenUnitNames = data.openUnitNames;
     if (data.playerRiichi) globalPlayerRiichi = data.playerRiichi;
     if (data.riichiDiscardIndex) globalRiichiDiscardIndex = data.riichiDiscardIndex;
     if (data.riichiSticks !== undefined) {
@@ -1808,7 +1827,7 @@ function handleHostMsg(data) {
         
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         let globalMemo = {};
-        let agariCheck = checkAgari(fullHand, globalMemo);
+        let agariCheck = checkPlayerAgari(myLocalHand, myId, globalMemo);
         
         if(agariCheck.isValid) { 
             let isClosed = (globalOpenTiles[myId] || []).length === 0;
@@ -1887,7 +1906,7 @@ function handleHostMsg(data) {
         if(data.discarder !== myId && roleMap[myId] !== 'CPU') {
             let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || []), data.tile];
             let globalMemo = {};
-            let agariCheck = checkAgari(fullHand, globalMemo);
+            let agariCheck = checkPlayerAgari([...myLocalHand, data.tile], myId, globalMemo);
             let canRon = false;
             
             if (agariCheck.isValid) {
@@ -1949,7 +1968,7 @@ function handleHostMsg(data) {
         let fullHand = [...myLocalHand, ...(globalOpenTiles[myId] || [])];
         
         let globalMemo = {};
-        let agariCheck = checkAgari(fullHand, globalMemo);
+        let agariCheck = checkPlayerAgari(myLocalHand, myId, globalMemo);
         if(agariCheck.isValid) { 
             let isClosed = (globalOpenTiles[myId] || []).length === 0;
             let isDealer = (myId === currentDealer);
