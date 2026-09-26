@@ -572,8 +572,15 @@ let gameEpoch = 0;
 let kyokuActive = false;
 let skipFuriten = [false, false, false, false];
 let localSkipFuriten = false;
-const ACTION_LIMIT_SEC = 12;
-const DISCARD_LIMIT_SEC = 20;
+let roomTimerSettings = { basicSeconds: 20, poolSeconds: 120 };
+let playerThinkingPools = [120, 120, 120, 120];
+let activeDecisionTimer = null;
+function readRoomTimerSettings() {
+    return {
+        basicSeconds: Number(document.getElementById('base-time-select').value),
+        poolSeconds: Number(document.getElementById('thinking-pool-select').value)
+    };
+}
 
 function setConnStatus(msg) {
     const el = document.getElementById('conn-status');
@@ -647,6 +654,8 @@ function sendToClient(idx, data) {
 }
 function broadcast(data) {
     data.openUnitNames = openUnitNames.map(names => [...names]);
+    data.timerSettings = roomTimerSettings;
+    data.thinkingPools = [...playerThinkingPools];
     const sent = new Set();
     playerConns.forEach(c => {
         if (c && c.open && !sent.has(c)) { c.send(data); sent.add(c); }
@@ -906,6 +915,7 @@ function discardFromHand(tile) {
 
 function createRoom() {
     if (!requireFavoriteIdol()) return;
+    roomTimerSettings = readRoomTimerSettings();
     isHost = true;
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     setConnStatus('部屋を作成しています...');
@@ -974,6 +984,7 @@ function initMatch() {
     playerConns = slots.map(s => s.conn);
     globalPlayerNames = slots.map(s => s.name);
     playerFavorites = slots.map(s => s.favoriteIdol);
+    playerThinkingPools = slots.map(s => s.role === 'CPU' ? 0 : roomTimerSettings.poolSeconds);
     hostSeat = playerRoles.indexOf('HOST');
     if (hostSeat < 0) hostSeat = 0;
     startKyoku();
@@ -982,6 +993,7 @@ function initMatch() {
 function startKyoku() {
     bumpGameEpoch();
     kyokuActive = true;
+    playerThinkingPools = playerRoles.map(role => role === 'CPU' ? 0 : roomTimerSettings.poolSeconds);
     deck = []; discards = [[],[],[],[]]; openTiles = [[],[],[],[]]; openUnitNames = [[],[],[],[]];
     playerRiichi = [false, false, false, false]; riichiDiscardIndex = [-1, -1, -1, -1];
     skipFuriten = [false, false, false, false];
@@ -994,7 +1006,7 @@ function startKyoku() {
     clerkState = { active: false, originalPlayer: null, discardsLeft: 0, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
     
     playerRoles.forEach((role, idx) => {
-        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, favorites: playerFavorites, handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
+        let msg = { type: 'START_KYOKU', pId: idx, hand: [...playerHands[idx]], deckLen: deck.length, roles: playerRoles, names: globalPlayerNames, favorites: playerFavorites, timerSettings: roomTimerSettings, thinkingPools: [...playerThinkingPools], handLens: getHandLens(), openTiles: getOpenTiles(), openUnitNames: openUnitNames, scores: playerScores, bakaze: currentBakaze, kyoku: currentKyoku, dealer: currentDealer, playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex };
         if(role === 'HOST') handleHostMsg(msg);
         else if(role === 'CLIENT') sendToClient(idx, msg);
     });
@@ -1034,10 +1046,10 @@ function handleClientMsg(conn, data) {
     
     let pIdx = playerConns.indexOf(conn);
     if (pIdx < 0) return;
-    if(data.type === 'DISCARD' && currentTurn === pIdx && !isWaitingAction) processDiscard(pIdx, data.tile, data.isRiichi);
-    if(data.type === 'ACTION') processNakiAction(pIdx, data.action, data.payload);
+    if(data.type === 'DISCARD' && currentTurn === pIdx && !isWaitingAction) processDiscard(pIdx, data.tile, data.isRiichi, data.spentExtraSeconds);
+    if(data.type === 'ACTION') processNakiAction(pIdx, data.action, data.payload, data.spentExtraSeconds);
     if(data.type === 'TSUMO' && currentTurn === pIdx) {
-        if (!processAgari(pIdx, true)) sendToClient(pIdx, { type: 'AGARI_REJECTED' });
+        if (!processAgari(pIdx, true, data.spentExtraSeconds)) sendToClient(pIdx, { type: 'AGARI_REJECTED', thinkingPools: [...playerThinkingPools] });
     }
 }
 function sendToHost(data) {
@@ -1049,29 +1061,32 @@ function restoreTurnAfterRejectedAgari() {
     renderHand(true);
     startDiscardTimer();
 }
-function sendAction(action, payload=null) {
+function sendAction(action, payload=null, spentExtraOverride=null) {
+    const measuredExtra = finishDecisionTimer();
+    const spentExtraSeconds = spentExtraOverride == null ? measuredExtra : spentExtraOverride;
     if(action === 'DISCARD') { 
         let t = payload.tile !== undefined ? payload.tile : payload;
         let r = payload.isRiichi || false;
-        if(isHost) processDiscard(hostSeat, t, r); else sendToHost({type:'DISCARD', tile: t, isRiichi: r}); 
+        if(isHost) processDiscard(hostSeat, t, r, spentExtraSeconds); else sendToHost({type:'DISCARD', tile: t, isRiichi: r, spentExtraSeconds});
     }
     else if(action === 'TSUMO') {
         if(isHost) {
-            if (!processAgari(hostSeat, true)) restoreTurnAfterRejectedAgari();
-        } else sendToHost({type:'TSUMO'});
+            if (!processAgari(hostSeat, true, spentExtraSeconds)) restoreTurnAfterRejectedAgari();
+        } else sendToHost({type:'TSUMO', spentExtraSeconds});
     }
-    else if(action === 'NAKI') { if(isHost) processNakiAction(hostSeat, action, payload); else sendToHost({type:'ACTION', action:action, payload:payload}); }
+    else if(action === 'NAKI') { if(isHost) processNakiAction(hostSeat, action, payload, spentExtraSeconds); else sendToHost({type:'ACTION', action:action, payload:payload, spentExtraSeconds}); }
     else {
         if (action === 'SKIP' && lastAskCouldRon) localSkipFuriten = true;
-        if(isHost) processNakiAction(hostSeat, action); else sendToHost({type:'ACTION', action:action});
+        if(isHost) processNakiAction(hostSeat, action, null, spentExtraSeconds); else sendToHost({type:'ACTION', action:action, spentExtraSeconds});
     }
 }
 
-function processDiscard(pIdx, tile, isRiichi = false) {
+function processDiscard(pIdx, tile, isRiichi = false, spentExtraSeconds = 0) {
     if (!kyokuActive || isWaitingAction) return; 
     if (currentTurn !== pIdx) return;
     let h = playerHands[pIdx]; let tIdx = h.indexOf(tile);
     if(tIdx === -1) return; 
+    chargeThinkingPool(pIdx, spentExtraSeconds);
     
     if (isRiichi && !playerRiichi[pIdx]) {
         if (!canRiichiAfterDiscard(pIdx, tile)) isRiichi = false;
@@ -1138,13 +1153,21 @@ function processDiscard(pIdx, tile, isRiichi = false) {
         }
     });
     if (nakiResponses.length === 3) nakiTimer = kyokuTimeout(resolveActions, 600);
-    else nakiTimer = kyokuTimeout(resolveActions, ACTION_LIMIT_SEC * 1000);
+    else if (roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0) {
+        nakiTimer = kyokuTimeout(resolveActions, 10000);
+    }
+    else {
+        const pendingPools = playerThinkingPools.filter((_, idx) => idx !== pIdx && playerRoles[idx] !== 'CPU');
+        const maxPool = pendingPools.length ? Math.max(...pendingPools) : 0;
+        nakiTimer = kyokuTimeout(resolveActions, (roomTimerSettings.basicSeconds + maxPool + 1) * 1000);
+    }
 }
 
-function processNakiAction(pIdx, action, payload=null) {
+function processNakiAction(pIdx, action, payload=null, spentExtraSeconds = 0) {
     if (!kyokuActive || !isWaitingAction || !currentDiscard) return;
     if(pIdx === currentDiscard.pIdx) return;
     if(nakiResponses.find(r => r.pIdx === pIdx)) return;
+    chargeThinkingPool(pIdx, spentExtraSeconds);
     if (action === 'RON') {
         const tile = currentDiscard.tile;
         const evalRon = evaluateAgari(pIdx, [...playerHands[pIdx], ...openTiles[pIdx], tile], tile, false);
@@ -1164,6 +1187,7 @@ function processNakiAction(pIdx, action, payload=null) {
         if (evalRon) skipFuriten[pIdx] = true;
     }
     nakiResponses.push({ pIdx, action, payload });
+    broadcast({ type: 'TIMER_UPDATE' });
     if(nakiResponses.length === 3) { clearTimeout(nakiTimer); resolveActions(); }
 }
 
@@ -1258,8 +1282,9 @@ function resolveActions() {
     advanceTurnAfterDiscard();
 }
 
-function processAgari(pIdx, isTsumo) {
+function processAgari(pIdx, isTsumo, spentExtraSeconds = 0) {
     if (!kyokuActive) return false;
+    chargeThinkingPool(pIdx, spentExtraSeconds);
     let fullHand = [...playerHands[pIdx], ...openTiles[pIdx]]; 
     let agariTile = isTsumo ? playerHands[pIdx][playerHands[pIdx].length - 1] : (currentDiscard ? currentDiscard.tile : null);
     if(!isTsumo) {
@@ -1921,53 +1946,99 @@ function updateScores(scores) {
 
 let lastAskCouldRon = false;
 
-function startActionTimer() {
-    let timeLeft = ACTION_LIMIT_SEC; 
-    document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">${timeLeft}</span>秒`;
-    clearInterval(actionTimerInterval);
-    
-    actionTimerInterval = setInterval(() => {
-        timeLeft--; 
-        let timerEl = document.getElementById('action-timer');
-        if (timerEl) timerEl.innerText = timeLeft;
-        if (timeLeft <= 0) { sendAction('SKIP'); hideActions(); }
-    }, 1000);
+function currentThinkingPool(pIdx = myId) {
+    const remaining = playerThinkingPools[pIdx];
+    return Number.isFinite(remaining) ? Math.max(0, remaining) : roomTimerSettings.poolSeconds;
 }
 
-function startDiscardTimer() {
-    let timeLeft = DISCARD_LIMIT_SEC; 
+function chargeThinkingPool(pIdx, spentExtraSeconds = 0) {
+    if (playerRoles[pIdx] === 'CPU') return;
+    const spent = Math.min(currentThinkingPool(pIdx), Math.max(0, Math.ceil(Number(spentExtraSeconds) || 0)));
+    playerThinkingPools[pIdx] = currentThinkingPool(pIdx) - spent;
+}
+
+function finishDecisionTimer() {
+    if (!activeDecisionTimer) return 0;
+    clearInterval(actionTimerInterval);
+    const elapsed = Math.min(
+        activeDecisionTimer.basicSeconds + activeDecisionTimer.poolSeconds,
+        (Date.now() - activeDecisionTimer.startedAt) / 1000
+    );
+    const extra = Math.min(activeDecisionTimer.poolSeconds, Math.max(0, Math.ceil(elapsed - activeDecisionTimer.basicSeconds)));
+    activeDecisionTimer = null;
+    return extra;
+}
+
+function startDecisionTimer(label, onExpire, isNakiDecision = false) {
+    clearInterval(actionTimerInterval);
+    const budget = document.getElementById('action-budget');
+    const noTurnLimit = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0;
+    if (noTurnLimit && !isNakiDecision) {
+        activeDecisionTimer = null;
+        if (budget) budget.innerText = '';
+        return;
+    }
+    const fixedNakiLimit = noTurnLimit && isNakiDecision;
+    activeDecisionTimer = {
+        startedAt: Date.now(),
+        basicSeconds: fixedNakiLimit ? 10 : roomTimerSettings.basicSeconds,
+        poolSeconds: fixedNakiLimit ? 0 : currentThinkingPool(),
+        fixedNakiLimit
+    };
+    const update = () => {
+        if (!activeDecisionTimer) return;
+        const elapsed = (Date.now() - activeDecisionTimer.startedAt) / 1000;
+        if (activeDecisionTimer.fixedNakiLimit && budget) {
+            budget.innerText = `鳴き判断 残り ${Math.ceil(activeDecisionTimer.basicSeconds - elapsed)}秒`;
+        } else if (elapsed < activeDecisionTimer.basicSeconds && budget) {
+            budget.innerText = `基本残り ${Math.ceil(activeDecisionTimer.basicSeconds - elapsed)}秒 ・ 長考プール ${activeDecisionTimer.poolSeconds}秒`;
+        } else if (budget) {
+            const poolLeft = Math.max(0, activeDecisionTimer.poolSeconds - Math.ceil(elapsed - activeDecisionTimer.basicSeconds));
+            budget.innerText = `長考中 ・ プール残り ${poolLeft}秒`;
+        }
+        if (elapsed >= activeDecisionTimer.basicSeconds + activeDecisionTimer.poolSeconds) {
+            const extra = finishDecisionTimer();
+            onExpire(extra);
+        }
+    };
+    update();
+    actionTimerInterval = setInterval(update, 250);
+}
+
+function startActionTimer() {
+    startDecisionTimer('ロン・鳴き判断', extra => {
+        sendAction('SKIP', null, extra);
+        hideActions();
+    }, true);
+}
+
+function startDiscardTimer(label = '打牌してください', canTsumo = false) {
     document.getElementById('action-bar').style.display = 'flex';
-    document.getElementById('action-msg-text').innerHTML = `捨てる牌を選択 <span id="action-timer" style="color:red; font-size:18px;">${timeLeft}</span>秒`;
-    document.getElementById('btn-tsumo').style.display = 'none';
+    document.getElementById('action-msg-text').innerText = label;
+    if (!canTsumo) document.getElementById('btn-tsumo').style.display = 'none';
     document.getElementById('btn-ron').style.display = 'none';
-    let nakiContainer = document.getElementById('naki-buttons-container');
+    const nakiContainer = document.getElementById('naki-buttons-container');
     if (nakiContainer) nakiContainer.innerHTML = '';
     document.getElementById('btn-skip').style.display = 'none';
-    
-    clearInterval(actionTimerInterval);
-    actionTimerInterval = setInterval(() => {
-        timeLeft--; 
-        let timerEl = document.getElementById('action-timer');
-        if (timerEl) timerEl.innerText = timeLeft;
-        if (timeLeft <= 0) { 
-            clearInterval(actionTimerInterval); 
-            isPendingRiichi = false;
-            autoDiscard(); 
-        }
-    }, 1000);
+    startDecisionTimer(label, extra => {
+        isPendingRiichi = false;
+        autoDiscard(extra);
+    });
 }
 
-function autoDiscard() {
+function autoDiscard(spentExtraSeconds = 0) {
     let unlocked = getUnlockedHand();
     if (unlocked.length > 0) {
-        sendAction('DISCARD', { tile: unlocked[unlocked.length - 1], isRiichi: false });
+        sendAction('DISCARD', { tile: unlocked[unlocked.length - 1], isRiichi: false }, spentExtraSeconds);
     } else {
-        sendAction('DISCARD', { tile: myLocalHand[myLocalHand.length - 1], isRiichi: false });
+        sendAction('DISCARD', { tile: myLocalHand[myLocalHand.length - 1], isRiichi: false }, spentExtraSeconds);
     }
     hideActions();
 }
 
 function handleHostMsg(data) {
+    if (data.timerSettings) roomTimerSettings = data.timerSettings;
+    if (data.thinkingPools) playerThinkingPools = data.thinkingPools;
     if (data.handLens) globalHandLens = data.handLens;
     if (data.openTiles) globalOpenTiles = data.openTiles;
     if (data.openUnitNames) globalOpenUnitNames = data.openUnitNames;
@@ -2028,6 +2099,7 @@ function handleHostMsg(data) {
     }
     
     if(data.type === 'DRAWN_TILE') {
+        validRiichiDiscards = [];
         if (!globalPlayerRiichi[myId]) localSkipFuriten = false;
         myLocalHand.push(data.tile); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); 
         showActionToast('あなたの番です', 'turn'); 
@@ -2050,6 +2122,7 @@ function handleHostMsg(data) {
                 document.getElementById('btn-riichi').style.display = 'none';
                 let nakiContainer = document.getElementById('naki-buttons-container');
                 if(nakiContainer) nakiContainer.innerHTML = '';
+                startDiscardTimer('ツモできます', true);
                 return;
             }
         }
@@ -2059,6 +2132,7 @@ function handleHostMsg(data) {
                 if(isMyTurnNow) { hideActions(); sendAction('DISCARD', { tile: data.tile, isRiichi: false }); }
             }, 800);
         } else {
+            let discardPrompt = '打牌してください';
             if ((globalOpenTiles[myId] || []).length === 0 && playerScores[myId] >= 1000) {
                 let tInfo = getTenpaiInfo(myLocalHand, [], true, myId);
                 let validWaits = tInfo.filter(t => t.waits.length > 0);
@@ -2067,8 +2141,10 @@ function handleHostMsg(data) {
                     document.getElementById('action-bar').style.display = 'flex';
                     document.getElementById('action-msg-text').innerHTML = `リーチ可能です`;
                     document.getElementById('btn-riichi').style.display = 'inline-block';
+                    discardPrompt = 'リーチ可能です';
                 }
             }
+            startDiscardTimer(discardPrompt);
         }
     }
     
@@ -2130,7 +2206,7 @@ function handleHostMsg(data) {
 
             if (canRon || nakiUnits) {
                 document.getElementById('action-bar').style.display = 'flex';
-                document.getElementById('action-msg-text').innerHTML = `アクション <span id="action-timer" style="color:red; font-size:18px;">${ACTION_LIMIT_SEC}</span>秒`;
+                document.getElementById('action-msg-text').innerText = 'ロン・鳴き判断';
                 document.getElementById('btn-tsumo').style.display = 'none';
                 document.getElementById('btn-riichi').style.display = 'none';
                 document.getElementById('btn-skip').style.display = 'inline-block';
@@ -2190,6 +2266,7 @@ function handleHostMsg(data) {
                 document.getElementById('btn-riichi').style.display = 'none';
                 let nakiContainer = document.getElementById('naki-buttons-container');
                 if (nakiContainer) nakiContainer.innerHTML = ''; 
+                startDiscardTimer('ツモできます', true);
                 return;
             }
         }
@@ -2330,6 +2407,7 @@ function renderHand(isMyTurn) {
 
 function hideActions() { 
     clearInterval(actionTimerInterval); 
+    document.getElementById('action-budget').innerText = '';
     document.getElementById('action-bar').style.display = 'none'; 
     document.getElementById('btn-tsumo').style.display = 'none'; 
     document.getElementById('btn-ron').style.display = 'none'; 

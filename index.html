@@ -231,6 +231,7 @@
 
         /* アクションボタン（スマホ対応で下部中央へ） */
         .action-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(255, 235, 59, 0.95); padding: 8px 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96vw, 640px); flex-wrap: wrap; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
+        #action-budget { flex: 1 0 100%; text-align: center; font-size: 13px; font-weight: bold; color: #a22; }
         
         #toast-container { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 300; pointer-events: none; display: flex; flex-direction: column; gap: 5px; align-items: center; }
         
@@ -350,6 +351,28 @@
                 </label>
                 <hr>
                 <h3 style="font-size: 16px; margin: 10px 0;">部屋を作る（ホスト）</h3>
+                <label style="display:block; margin-bottom:8px; font-size:14px;">
+                    基本時間（毎回）
+                    <select id="base-time-select" style="display:block; padding:6px; width:100%; box-sizing:border-box; margin-top:4px;">
+                        <option value="0">なし（制限なし）</option>
+                        <option value="10">10秒</option>
+                        <option value="15">15秒</option>
+                        <option value="20" selected>20秒</option>
+                        <option value="30">30秒</option>
+                        <option value="45">45秒</option>
+                    </select>
+                </label>
+                <label style="display:block; margin-bottom:10px; font-size:14px;">
+                    長考プール（各プレイヤー・対局中の合計）
+                    <select id="thinking-pool-select" style="display:block; padding:6px; width:100%; box-sizing:border-box; margin-top:4px;">
+                        <option value="0">なし</option>
+                        <option value="30">30秒</option>
+                        <option value="60">1分</option>
+                        <option value="120" selected>2分</option>
+                        <option value="180">3分</option>
+                        <option value="300">5分</option>
+                    </select>
+                </label>
                 <select id="game-rule" style="padding: 5px; font-size: 14px; margin-bottom: 10px; width: 100%;">
                     <option value="1">東風戦 (1周)</option>
                     <option value="2">半荘戦 (2周)</option>
@@ -413,6 +436,7 @@
 
                 <div class="action-bar" id="action-bar">
                     <span style="font-weight:bold; margin-right:5px; font-size: 14px;"><span id="action-msg-text">アクション</span></span>
+                        <span id="action-budget"></span>
                     <button class="btn" id="btn-riichi" style="display:none; background: #ff9800;" onclick="toggleRiichi()">リーチ</button>
                     <button class="btn" id="btn-tsumo" style="display:none;" onclick="sendAction('TSUMO'); hideActions();">ツモ！</button>
                     <button class="btn" id="btn-ron" style="display:none; background: #e91e63;" onclick="sendAction('RON'); hideActions();">ロン！</button>
