@@ -36,6 +36,8 @@ function layoutTable() {
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const root = document.documentElement;
+    const playerDock = document.getElementById('player-dock');
+    if (playerDock) root.style.setProperty('--player-dock-height', `${playerDock.offsetHeight}px`);
     const isPortrait = height > width;
     const isCompactLandscape = !isPortrait && height < 480;
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
