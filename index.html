@@ -146,7 +146,7 @@
         .mahjong-tile.open-tile { box-shadow: 0 0 8px #ffeb3b, 1px 3px 0 #2e8b57; border-color: #ffeb3b; }
         
         /* 自分の手牌 */
-        #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; align-items: flex-end; gap: 2px; padding: 14px 0 8px; width: max-content; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
+        #my-hand-area { position: relative; left: auto; bottom: auto; transform: none; display: flex; flex: 0 1 auto; align-items: flex-end; gap: 2px; padding: 14px 0 8px; width: max-content; min-width: 0; max-width: calc(100% - 70px); overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
         #my-hand-area .mahjong-tile { flex: 0 0 auto; width: var(--hand-tile-w); height: var(--hand-tile-h); cursor: grab; margin: 1px 2px; }
         #my-hand-area .mahjong-tile:hover:not(.disabled):not(.locked-tile):not(.open-tile) { transform: translateY(-8px); }
         #my-hand-area .mahjong-tile.disabled { pointer-events: none; }
@@ -450,8 +450,8 @@
             </div>
             <div id="player-dock">
                 <div id="player-hand-row">
-                    <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
                     <div id="my-hand-area"></div>
+                    <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
                 </div>
                 <div id="action-budget" aria-live="off"></div>
             </div>

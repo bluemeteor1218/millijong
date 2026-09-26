@@ -13,24 +13,36 @@ function layoutActionBudget() {
     const hand = document.getElementById('my-hand-area');
     const budget = document.getElementById('action-budget');
     const dock = document.getElementById('player-dock');
-    if (!row || !sortButton || !hand || !budget || !dock) return;
+    const gameBoard = document.getElementById('game-board');
+    if (!row || !sortButton || !hand || !budget || !dock || !gameBoard) return;
 
     const rowWidth = row.clientWidth;
     if (rowWidth < 1) return;
     const rowStyle = getComputedStyle(row);
     const gap = parseFloat(rowStyle.columnGap) || 0;
     const buttonWidth = sortButton.getBoundingClientRect().width;
-    const reservedBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
-    const maxHandWidth = Math.max(0, rowWidth - buttonWidth - reservedBudgetWidth - gap * 2);
-    hand.style.maxWidth = `${maxHandWidth}px`;
+    const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
+    budget.style.width = `${budgetWidth}px`;
     const rowRect = row.getBoundingClientRect();
     const dockRect = dock.getBoundingClientRect();
-    const handRect = hand.getBoundingClientRect();
-    const availableBudgetWidth = Math.max(0, rowRect.right - handRect.right - gap);
-    const budgetWidth = Math.min(240, availableBudgetWidth);
-    budget.style.width = `${budgetWidth}px`;
     budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
     budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
+
+    const timerRect = budget.getBoundingClientRect();
+    const playLeft = gameBoard.getBoundingClientRect().left;
+    const tile = hand.querySelector('.mahjong-tile');
+    const tileStyle = tile ? getComputedStyle(tile) : null;
+    const tileWidth = tile ? tile.getBoundingClientRect().width : parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hand-tile-w')) || 30;
+    const marginLeft = tileStyle ? parseFloat(tileStyle.marginLeft) || 0 : 2;
+    const horizontalMargins = tileStyle ? marginLeft + (parseFloat(tileStyle.marginRight) || 0) : 4;
+    const handGap = parseFloat(getComputedStyle(hand).columnGap) || 0;
+    const openSeparator = hand.querySelector('[data-hand-kind="spacer"]') ? parseFloat(hand.querySelector('[data-hand-kind="spacer"]').style.width) || 0 : 0;
+    const thirteenTileWidth = 13 * (tileWidth + horizontalMargins) + 12 * handGap + openSeparator;
+    const targetHandLeft = ((playLeft + timerRect.left) / 2) - (thirteenTileWidth / 2) - marginLeft;
+    const handOffset = Math.max(0, targetHandLeft - rowRect.left);
+    hand.style.marginLeft = `${handOffset}px`;
+    const handMaxWidth = Math.max(0, timerRect.left - rowRect.left - handOffset - buttonWidth - gap);
+    hand.style.maxWidth = `${handMaxWidth}px`;
 
     if (!_actionBudgetMeasureContext) {
         _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
