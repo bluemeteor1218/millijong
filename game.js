@@ -309,7 +309,8 @@ function canPossiblyExtract(hand, required) {
 }
 
 function scoreHand(units, hand, openTiles, agariTile, isClosed, isRiichi, isTsumo, isDealer, pIdx = null) {
-    return calculateMahjongScore(units, hand, openTiles || [], agariTile, isClosed, isRiichi, isTsumo, isDealer, OFFICIAL_UNITS, playerFavorites[pIdx] || null);
+    const openNames = pIdx == null ? null : (isHost ? openUnitNames[pIdx] : globalOpenUnitNames[pIdx]);
+    return calculateMahjongScore(units, hand, openTiles || [], agariTile, isClosed, isRiichi, isTsumo, isDealer, OFFICIAL_UNITS, playerFavorites[pIdx] || null, openNames);
 }
 
 function tileFillsReq(tile, req) {

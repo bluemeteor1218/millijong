@@ -64,10 +64,11 @@ function unitComboFu(len, isOpen) {
     return isOpen ? 16 : 32;
 }
 
-function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile) {
+function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile, openUnitNames) {
     let openTiles = [];
     let agariTile = null;
     let isClosed, isRiichi, isTsumo, isDealer, official;
+    const remainingOpenNames = Array.isArray(openUnitNames) ? openUnitNames.slice() : null;
 
     if (typeof a === 'boolean' || a == null) {
         isClosed = !!a;
@@ -106,8 +107,12 @@ function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile) {
         const unitData = official.find(o => o.name === uName);
         if (!unitData) return;
         const len = unitData.members.length;
-        const isOpenUnit = !isClosed && _canFillFrom(openPool, unitData.members);
+        const namedOpenIndex = remainingOpenNames ? remainingOpenNames.indexOf(uName) : -1;
+        const isOpenUnit = !isClosed && (remainingOpenNames
+            ? namedOpenIndex !== -1
+            : _canFillFrom(openPool, unitData.members));
         if (isOpenUnit) {
+            if (namedOpenIndex !== -1) remainingOpenNames.splice(namedOpenIndex, 1);
             unitData.members.forEach(m => {
                 const idx = openPool.indexOf(m);
                 if (idx !== -1) openPool.splice(idx, 1);
@@ -179,6 +184,10 @@ function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile) {
         totalScore = Math.ceil((basePoint * 4) / 100) * 100;
         payDealer = Math.ceil((basePoint * 2) / 100) * 100;
         payChild = Math.ceil(basePoint / 100) * 100;
+    }
+
+    if (isTsumo) {
+        totalScore = isDealer ? payAll * 3 : payDealer + (payChild * 2);
     }
 
     details.push(`【 ${rank} 】`);
