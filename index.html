@@ -65,8 +65,8 @@
         #return-lobby-overlay.open { display: flex; }
         #return-lobby-dialog { width: min(92vw, 380px); padding: 20px; border: 2px solid #9aa7b0; border-radius: 8px; background: #111a22; color: #fff; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
         #return-lobby-actions { display: flex; justify-content: center; gap: 12px; margin-top: 18px; }
-        #btn-open-unit-login, #btn-return-lobby { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); z-index: 1100; box-shadow: 0 3px 12px rgba(0,0,0,0.35); }
-        #btn-return-lobby { display: none; z-index: 250; background: #666; }
+        #btn-open-unit-login { position: fixed; left: max(14px, env(safe-area-inset-left)); bottom: max(14px, env(safe-area-inset-bottom)); z-index: 1100; box-shadow: 0 3px 12px rgba(0,0,0,0.35); }
+        #btn-return-lobby { display: none; background: #666; min-height: 36px; padding: 5px 6px; font-size: 12px; }
         .management-overlay { position: fixed; inset: 0; z-index: 3100; display: none; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; background: rgba(0,0,0,0.76); }
         .management-overlay.open { display: flex; }
         .management-dialog { box-sizing: border-box; width: min(100%, 440px); max-height: 92vh; overflow-y: auto; padding: 22px; border: 2px solid #9aa7b0; border-radius: 8px; background: #111a22; color: #fff; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
@@ -94,6 +94,10 @@
 
         #progress-sidebar { width: clamp(200px, 25vw, 340px); background: #fdfdfd; border-right: 2px solid #aaa; display: flex; flex-direction: column; padding: clamp(10px, 1.5vw, 15px); box-sizing: border-box; overflow-y: auto; z-index: 150; box-shadow: 2px 0 10px rgba(0,0,0,0.5); }
         .progress-header { font-size: clamp(14px, 1.5vw, 18px); font-weight: bold; border-bottom: 2px solid #ccc; padding-bottom: 10px; margin-bottom: 15px; color: #333; }
+        #progress-toggle-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 15px; }
+        .progress-toggle { display: flex; flex-direction: column; flex: 1 1 0; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 112px; padding: 10px 4px; font-size: 13px; line-height: 1.2; }
+        .progress-toggle-label { writing-mode: vertical-rl; text-orientation: upright; }
+        .progress-toggle-state { writing-mode: horizontal-tb; font-size: 12px; }
         .progress-item { margin-bottom: 10px; padding: 10px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; transition: background 0.2s, border-color 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .progress-item:hover { background: #e0f7fa; border-color: #00bcd4; }
         .progress-item.selected { background: #fffde7; border-color: #fbc02d; border-width: 2px; }
@@ -127,6 +131,7 @@
             background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0));
             z-index: 30; }
         #player-hand-row { display: flex; flex: 0 0 auto; align-items: flex-end; justify-content: flex-start; gap: 8px; min-width: 0; width: 100%; }
+        #hand-controls { display: flex; flex: 0 0 auto; flex-direction: column; gap: 4px; }
         #btn-sort-hand { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; background: #4aa9e6; min-height: 40px; }
         #player-hand-scroll { position: relative; display: flex; flex: 0 0 auto; align-items: flex-end; min-width: 0; overflow-x: auto; overflow-y: hidden; touch-action: pan-x; -webkit-overflow-scrolling: touch; }
         
@@ -349,7 +354,6 @@
     <button id="mobile-sidebar-toggle" onclick="toggleSidebar()">📋 役・進捗確認</button>
     <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
     <button id="btn-open-unit-login" class="btn" onclick="openUnitEditorLogin()">ユニット管理</button>
-    <button id="btn-return-lobby" class="btn" onclick="showReturnLobbyConfirmation()">ロビーに戻る</button>
 
     <div class="panel" id="setup-panel">
         <h1 style="margin-top:0; font-size: 22px; text-align:center;">ミリオン麻雀</h1>
@@ -432,9 +436,11 @@
     <div id="app-container">
         <div id="progress-sidebar">
             <div class="progress-header">ユニット進捗 <span style="font-size:12px; font-weight:normal; color:#666;">(クリックでロック)</span></div>
-            <button id="btn-toggle-alm" class="btn" style="width:100%; margin-bottom:15px; background:#4caf50;" onclick="toggleAlmighty()">ALM牌で予測: ON</button>
-            <button id="btn-toggle-naki-alm" class="btn" style="width:100%; margin-bottom:8px; background:#4caf50;" aria-pressed="true" onclick="toggleNakiAlmighty()">鳴きでALM牌使用: ON</button>
-            <button id="btn-auto-win" class="btn" style="width:100%; margin-bottom:15px; background:#9e9e9e;" aria-pressed="false" onclick="toggleAutoWin()">自動和了: OFF</button>
+            <div id="progress-toggle-group">
+                <button id="btn-toggle-alm" class="btn progress-toggle" style="background:#4caf50;" aria-pressed="true" onclick="toggleAlmighty()"><span class="progress-toggle-label">ALM牌で予測</span><span class="progress-toggle-state">ON</span></button>
+                <button id="btn-toggle-naki-alm" class="btn progress-toggle" style="background:#4caf50;" aria-pressed="true" onclick="toggleNakiAlmighty()"><span class="progress-toggle-label">鳴きでALM牌使用</span><span class="progress-toggle-state">ON</span></button>
+                <button id="btn-auto-win" class="btn progress-toggle" style="background:#9e9e9e;" aria-pressed="false" onclick="toggleAutoWin()"><span class="progress-toggle-label">自動和了</span><span class="progress-toggle-state">OFF</span></button>
+            </div>
             <div id="progress-list"></div>
         </div>
 
@@ -484,7 +490,10 @@
             </div>
             <div id="player-dock">
                 <div id="player-hand-row">
-                    <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
+                    <div id="hand-controls">
+                        <button id="btn-return-lobby" class="btn" onclick="showReturnLobbyConfirmation()">ロビーに戻る</button>
+                        <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
+                    </div>
                     <div id="player-hand-scroll">
                         <div id="my-hand-area"></div>
                         <div id="my-open-area"></div>

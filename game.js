@@ -449,20 +449,20 @@ function layoutTable() {
 let _actionBudgetMeasureContext = null;
 function layoutActionBudget() {
     const row = document.getElementById('player-hand-row');
-    const sortButton = document.getElementById('btn-sort-hand');
+    const handControls = document.getElementById('hand-controls');
     const scroll = document.getElementById('player-hand-scroll');
     const hand = document.getElementById('my-hand-area');
     const budget = document.getElementById('action-budget');
     const dock = document.getElementById('player-dock');
     const gameBoard = document.getElementById('game-board');
-    if (!row || !sortButton || !scroll || !hand || !budget || !dock || !gameBoard) return;
+    if (!row || !handControls || !scroll || !hand || !budget || !dock || !gameBoard) return;
 
     const rowWidth = row.clientWidth;
     if (rowWidth < 1) return;
     const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
-    const buttonWidth = sortButton.getBoundingClientRect().width;
+    const controlsWidth = handControls.getBoundingClientRect().width;
     const budgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
-    const scrollWidth = Math.max(0, rowWidth - buttonWidth - budgetWidth - gap * 2);
+    const scrollWidth = Math.max(0, rowWidth - controlsWidth - budgetWidth - gap * 2);
     scroll.style.width = `${scrollWidth}px`;
     scroll.style.flexBasis = `${scrollWidth}px`;
 
@@ -603,15 +603,16 @@ let pendingAutoWinAction = null;
 function toggleAlmighty() {
     useAlmForProgress = !useAlmForProgress;
     const button = document.getElementById('btn-toggle-alm');
-    button.innerText = useAlmForProgress ? 'ALM牌で予測: ON' : 'ALM牌で予測: OFF';
+    button.querySelector('.progress-toggle-state').innerText = useAlmForProgress ? 'ON' : 'OFF';
     button.style.background = useAlmForProgress ? '#4caf50' : '#9e9e9e';
+    button.setAttribute('aria-pressed', String(useAlmForProgress));
     updateProgressUI();
 }
 
 function toggleNakiAlmighty() {
     useAlmightyForNaki = !useAlmightyForNaki;
     const button = document.getElementById('btn-toggle-naki-alm');
-    button.innerText = `鳴きでALM牌使用: ${useAlmightyForNaki ? 'ON' : 'OFF'}`;
+    button.querySelector('.progress-toggle-state').innerText = useAlmightyForNaki ? 'ON' : 'OFF';
     button.style.background = useAlmightyForNaki ? '#4caf50' : '#9e9e9e';
     button.setAttribute('aria-pressed', String(useAlmightyForNaki));
 }
@@ -619,7 +620,7 @@ function toggleNakiAlmighty() {
 function toggleAutoWin() {
     autoWinEnabled = !autoWinEnabled;
     const button = document.getElementById('btn-auto-win');
-    button.innerText = `自動和了: ${autoWinEnabled ? 'ON' : 'OFF'}`;
+    button.querySelector('.progress-toggle-state').innerText = autoWinEnabled ? 'ON' : 'OFF';
     button.style.background = autoWinEnabled ? '#4caf50' : '#9e9e9e';
     button.setAttribute('aria-pressed', String(autoWinEnabled));
     if (autoWinEnabled && pendingAutoWinAction && document.getElementById('action-bar').style.display !== 'none') {
