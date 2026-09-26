@@ -61,6 +61,10 @@
         
         /* ロビー画面の最適化（ワイド化・2列対応） */
         .panel { background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 8px; position: absolute; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.5); width: 95vw; max-width: 650px; max-height: 95vh; overflow-y: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); box-sizing: border-box;}
+        #return-lobby-overlay { position: fixed; inset: 0; z-index: 3000; display: none; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; background: rgba(0,0,0,0.72); }
+        #return-lobby-overlay.open { display: flex; }
+        #return-lobby-dialog { width: min(92vw, 380px); padding: 20px; border: 2px solid #9aa7b0; border-radius: 8px; background: #111a22; color: #fff; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+        #return-lobby-actions { display: flex; justify-content: center; gap: 12px; margin-top: 18px; }
         .setup-columns { display: flex; gap: 20px; flex-wrap: wrap; }
         .setup-left { flex: 1.2; min-width: 250px; }
         .setup-right { flex: 1; min-width: 220px; }
@@ -409,6 +413,7 @@
             <div class="progress-header">ユニット進捗 <span style="font-size:12px; font-weight:normal; color:#666;">(クリックでロック)</span></div>
             <button id="btn-toggle-alm" class="btn" style="width:100%; margin-bottom:15px; background:#4caf50;" onclick="toggleAlmighty()">ALM牌で予測: ON</button>
             <div id="progress-list"></div>
+            <button id="btn-return-lobby" class="btn" style="width:100%; margin-top:10px; background:#666;" onclick="showReturnLobbyConfirmation()">ロビーに戻る</button>
         </div>
 
         <div id="game-board">
@@ -492,6 +497,15 @@
         <button class="btn" id="btn-next-kyoku" style="display:none; margin-top: 20px; font-size: 16px; padding: 10px 30px;" onclick="advanceResultStage()">点数移動を見る</button>
         <div id="next-kyoku-msg" style="display:none; margin-top: 20px; font-size: 16px; color: #aaa;">他プレイヤーの確認を待っています...</div>
         <button class="btn" id="btn-endmatch" style="display:none; margin-top: 30px; background: #fff; color: #333;" onclick="location.reload();">タイトルへ戻る</button>
+    </div>
+    <div id="return-lobby-overlay" onclick="if(event.target===this) hideReturnLobbyConfirmation()">
+        <div id="return-lobby-dialog" role="dialog" aria-modal="true" aria-labelledby="return-lobby-title">
+            <h2 id="return-lobby-title" style="margin:0 0 10px;">ロビーに戻りますか？</h2>
+            <div id="return-lobby-actions">
+                <button class="btn" style="background:#666;" onclick="hideReturnLobbyConfirmation()">いいえ</button>
+                <button class="btn" style="background:#4caf50;" onclick="confirmReturnToLobby()">はい</button>
+            </div>
+        </div>
     </div>
 
 <script src="game.js" defer></script>

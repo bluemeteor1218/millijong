@@ -6,6 +6,18 @@ function toggleSidebar() {
     overlay.classList.toggle('open');
 }
 
+function showReturnLobbyConfirmation() {
+    document.getElementById('return-lobby-overlay').classList.add('open');
+}
+
+function hideReturnLobbyConfirmation() {
+    document.getElementById('return-lobby-overlay').classList.remove('open');
+}
+
+function confirmReturnToLobby() {
+    window.location.reload();
+}
+
 /*
 let _actionBudgetMeasureContext = null;
 function layoutActionBudget() {
@@ -1429,7 +1441,7 @@ function processDiscard(pIdx, tile, isRiichi = false, spentExtraSeconds = 0) {
         let d1 = deck.pop(); let d2 = deck.pop(); h.push(d1, d2);
         
         broadcast({ type: 'CLERK_EFFECT', pIdx: pIdx, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
-        let msg = { type: 'CLERK_DRAW', drawn: [d1, d2] };
+        let msg = { type: 'CLERK_DRAW', drawn: [d1, d2], discardsLeft: clerkState.discardsLeft };
         if (playerRoles[pIdx] === 'HOST') handleHostMsg(msg);
         else if (playerRoles[pIdx] === 'CLIENT') sendToClient(pIdx, msg);
         if (playerRoles[pIdx] === 'CPU') { kyokuTimeout(() => { processDiscard(pIdx, getCpuDiscard(h, pIdx), false); }, 1200); }
@@ -1503,7 +1515,7 @@ function advanceTurnAfterDiscard() {
         if (clerkState.discardsLeft > 0) {
             clerkState.interruptedByNaki = false;
             currentTurn = clerkState.originalPlayer;
-            broadcast({ type: 'TURN_CONTINUE', pIdx: currentTurn, handLens: getHandLens(), openTiles: getOpenTiles() });
+            broadcast({ type: 'TURN_CONTINUE', pIdx: currentTurn, clerkDiscardsLeft: clerkState.discardsLeft, handLens: getHandLens(), openTiles: getOpenTiles() });
             if (playerRoles[currentTurn] === 'CPU') { kyokuTimeout(() => { processDiscard(currentTurn, getCpuDiscard(playerHands[currentTurn], currentTurn), false); }, 1200); }
             return;
         } else {
@@ -2114,6 +2126,8 @@ function getRemaining(req, visibleTiles) {
 
 let _progressKey = '';
 let _progressTimer = null;
+let _tenpaiProgressKey = '';
+let _tenpaiProgressCache = [];
 function scheduleProgressUI() {
     const key = myLocalHand.join(',') + '|' + (globalOpenTiles[myId] || []).join(',') + '|' + [...lockedUnits].sort().join(',') + '|' + useAlmForProgress;
     if (key === _progressKey) return;
@@ -2138,14 +2152,33 @@ function updateProgressUI() {
     const openTiles = globalOpenTiles[myId] || [];
     const riichiTurn = !!globalPlayerRiichi[myId] && isMyTurnNow;
     const navHand = riichiTurn ? myLocalHand.slice(0, -1) : myLocalHand;
-    const tenpaiInfo = getTenpaiInfo(
-        navHand,
-        openTiles,
-        isMyTurnNow && !globalPlayerRiichi[myId],
+    const tenpaiKey = [
+        navHand.slice().sort().join(','),
+        openTiles.slice().sort().join(','),
+        discards.map(river => river.join(',')).join('|'),
+        isMyTurnNow,
         myId,
-        true,
+        currentDealer,
+        playerScores[myId],
+        playerFavorites[myId],
         !!globalPlayerRiichi[myId]
-    );
+    ].join('~');
+    if (tenpaiKey !== _tenpaiProgressKey) {
+        _tenpaiProgressCache = getTenpaiInfo(
+            navHand,
+            openTiles,
+            isMyTurnNow && !globalPlayerRiichi[myId],
+            myId,
+            true,
+            !!globalPlayerRiichi[myId]
+        );
+        _tenpaiProgressKey = tenpaiKey;
+    }
+    const tenpaiInfo = _tenpaiProgressCache.slice().sort((a, b) => {
+        if (a.discard === null) return b.discard === null ? 0 : -1;
+        if (b.discard === null) return 1;
+        return navHand.indexOf(a.discard) - navHand.indexOf(b.discard);
+    });
     if (tenpaiInfo.length > 0) {
         let tenpaiDiv = document.createElement('div');
         tenpaiDiv.style.marginBottom = '15px';
@@ -2594,10 +2627,22 @@ function handleHostMsg(data) {
         statusEl.innerText = '他家アクション待機中...'; statusEl.style.color = '#ffeb3b'; statusEl.style.visibility = 'visible'; 
     }
     if(data.type === 'CLERK_EFFECT') { document.getElementById('deck-count').innerText = data.deckLen; renderOtherHands(); }
-    if(data.type === 'CLERK_DRAW') { myLocalHand.push(...data.drawn); reorderLockedTilesToLeft(); isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn'); }
+    if(data.type === 'CLERK_DRAW') {
+        myLocalHand.push(...data.drawn);
+        reorderLockedTilesToLeft();
+        isMyTurnNow = true;
+        renderHand(true);
+        showActionToast('あなたの番です', 'turn');
+        startDiscardTimer(`事務員牌の効果: ${data.discardsLeft}枚切ってください`);
+    }
     if(data.type === 'TURN_CONTINUE') { 
         clientCurrentTurn = data.pIdx; updateScores(playerScores);
-        if(data.pIdx === myId) { isMyTurnNow = true; renderHand(true); showActionToast('あなたの番です', 'turn'); } 
+        if(data.pIdx === myId) {
+            isMyTurnNow = true;
+            renderHand(true);
+            showActionToast('あなたの番です', 'turn');
+            startDiscardTimer(`事務員牌の効果: 残り${data.clerkDiscardsLeft}枚切ってください`);
+        }
         renderOtherHands(); 
     }
     
