@@ -987,9 +987,20 @@ function processDiscard(pIdx, tile, isRiichi = false) {
         playerRiichi: playerRiichi, riichiSticks: riichiSticks, riichiDiscardIndex: riichiDiscardIndex, scores: playerScores
     });
     
-    if ((tile === "青葉美咲" || tile === "音無小鳥") && !playerRiichi[pIdx]) {
-        if (deck.length < 2) { broadcast({ type: 'MSG', msg: "山札が足りず効果不発。" }); advanceTurnAfterDiscard(); return; }
-        clerkState = { active: true, originalPlayer: pIdx, discardsLeft: 2, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
+    const isClerkTile = tile === "青葉美咲" || tile === "音無小鳥";
+    const continuesClerkEffect = clerkState.active && pIdx === clerkState.originalPlayer && !clerkState.interruptedByNaki;
+    if (isClerkTile && !playerRiichi[pIdx] && (!clerkState.active || continuesClerkEffect)) {
+        if (deck.length < 2) {
+            if (continuesClerkEffect) clerkState.discardsLeft--;
+            broadcast({ type: 'MSG', msg: "山札が足りず効果不発。" });
+            advanceTurnAfterDiscard();
+            return;
+        }
+        if (continuesClerkEffect) {
+            clerkState.discardsLeft = Math.max(0, clerkState.discardsLeft - 1) + 2;
+        } else {
+            clerkState = { active: true, originalPlayer: pIdx, discardsLeft: 2, firstNakiPlayer: null, secondNakiPlayer: null, interruptedByNaki: false };
+        }
         let d1 = deck.pop(); let d2 = deck.pop(); h.push(d1, d2);
         
         broadcast({ type: 'CLERK_EFFECT', pIdx: pIdx, deckLen: deck.length, handLens: getHandLens(), openTiles: getOpenTiles() });
