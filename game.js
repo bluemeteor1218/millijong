@@ -1,24 +1,3 @@
-const preloadedImages = [];
-let _imagesPreloaded = false;
-function preloadIdolImages() {
-    if (_imagesPreloaded) return;
-    if (typeof ALL_TILE_TYPES === 'undefined') return;
-    _imagesPreloaded = true;
-    const types = ALL_TILE_TYPES.slice();
-    let i = 0;
-    function pump() {
-        const end = Math.min(i + 12, types.length);
-        for (; i < end; i++) {
-            const img = new Image();
-            img.decoding = 'async';
-            img.src = `idol_images/${types[i]}.png`;
-            preloadedImages.push(img);
-        }
-        if (i < types.length) requestAnimationFrame(pump);
-    }
-    pump();
-}
-
 // モバイル用サイドバー切り替え
 function toggleSidebar() {
     const sidebar = document.getElementById('progress-sidebar');
@@ -28,18 +7,105 @@ function toggleSidebar() {
 }
 
 let _layoutLock = false;
+let _layoutPending = false;
+let _tableResizeObserver = null;
 function layoutTable() {
-    if (_layoutLock) return;
+    if (_layoutLock) {
+        _layoutPending = true;
+        return;
+    }
     _layoutLock = true;
-    requestAnimationFrame(() => { _layoutLock = false; });
+    requestAnimationFrame(() => {
+        _layoutLock = false;
+        if (_layoutPending) {
+            _layoutPending = false;
+            layoutTable();
+        }
+    });
     const board = document.getElementById('table-area') || document.getElementById('game-board');
-    const center = document.getElementById('center-status');
     const app = document.getElementById('app-container');
-    if (!board || !center || !app || app.style.display === 'none') return;
-    if (board.offsetWidth < 40 || center.offsetWidth < 20) return;
-    const br = board.getBoundingClientRect();
-    const tilt = br.height < 420 ? '24deg' : (br.height < 560 ? '26deg' : '28deg');
-    document.documentElement.style.setProperty('--table-tilt', tilt);
+    if (!board || !app || app.style.display === 'none') return;
+
+    if (!_tableResizeObserver && typeof ResizeObserver !== 'undefined') {
+        _tableResizeObserver = new ResizeObserver(() => layoutTable());
+        _tableResizeObserver.observe(board);
+    }
+
+    const { width, height } = board.getBoundingClientRect();
+    if (width < 40 || height < 40) return;
+
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const root = document.documentElement;
+    const isPortrait = height > width;
+    const isCompactLandscape = !isPortrait && height < 480;
+    const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
+    const handHeight = clamp(handWidth * 1.4, 34, 64);
+    const riverLength = isPortrait ? height : width;
+    const riverWidth = clamp(Math.min(width * 0.073, height * 0.07, (riverLength - 34) / 18), 12, 48);
+    const riverHeight = riverWidth * 1.4;
+    const otherWidth = clamp(riverWidth * 0.86, 17, 40);
+    const otherHeight = otherWidth * 1.4;
+    const centerScale = clamp(Math.min(width / 440, height / 600), 0.62, 0.86);
+    const tilt = height < 420 ? 22 : height < 560 ? 25 : 28;
+
+    root.style.setProperty('--hand-tile-w', `${handWidth}px`);
+    root.style.setProperty('--hand-tile-h', `${handHeight}px`);
+    root.style.setProperty('--river-tile-w', `${riverWidth}px`);
+    root.style.setProperty('--river-tile-h', `${riverHeight}px`);
+    root.style.setProperty('--other-tile-w', `${otherWidth}px`);
+    root.style.setProperty('--other-tile-h', `${otherHeight}px`);
+    root.style.setProperty('--tile-depth', `${clamp(handWidth * 0.12, 3, 6)}px`);
+    root.style.setProperty('--center-scale', centerScale);
+    root.style.setProperty('--table-tilt', `${tilt}deg`);
+
+    const rivers = [0, 1, 2, 3].map(index => document.getElementById(`river-${index}`));
+    rivers.forEach((river, index) => {
+        if (!river) return;
+        const isLongRow = isPortrait ? index === 1 || index === 3 : isCompactLandscape && (index === 0 || index === 2);
+        const columns = isLongRow ? 18 : 6;
+        const rows = isLongRow ? 1 : 3;
+        river.style.width = `${columns * riverWidth + (columns - 1) * 2}px`;
+        river.style.gridTemplateColumns = `repeat(${columns}, ${riverWidth}px)`;
+        river.style.gridTemplateRows = `repeat(${rows}, ${riverHeight}px)`;
+        river.style.gridAutoRows = `${riverHeight}px`;
+    });
+
+    const [bottomRiver, rightRiver, topRiver, leftRiver] = rivers;
+    if (isPortrait) {
+        rightRiver.style.left = '76%';
+        leftRiver.style.left = '24%';
+        bottomRiver.style.top = '68%';
+        bottomRiver.style.left = '50%';
+        bottomRiver.style.direction = 'ltr';
+        topRiver.style.top = '13%';
+        topRiver.style.left = '50%';
+        topRiver.style.direction = 'ltr';
+    } else if (isCompactLandscape) {
+        rightRiver.style.left = '73%';
+        leftRiver.style.left = '27%';
+        bottomRiver.style.top = '78%';
+        bottomRiver.style.left = '45%';
+        bottomRiver.style.direction = 'rtl';
+        topRiver.style.top = '17%';
+        topRiver.style.left = '47%';
+        topRiver.style.direction = 'ltr';
+    } else {
+        rightRiver.style.left = '73%';
+        leftRiver.style.left = '27%';
+        bottomRiver.style.top = '68%';
+        bottomRiver.style.left = '50%';
+        bottomRiver.style.direction = 'ltr';
+        topRiver.style.top = '13%';
+        topRiver.style.left = '50%';
+        topRiver.style.direction = 'ltr';
+    }
+
+    const rightSeat = document.getElementById('seat-1');
+    const topSeat = document.getElementById('seat-2');
+    const leftSeat = document.getElementById('seat-3');
+    if (rightSeat) rightSeat.style.left = isPortrait ? '88%' : '87%';
+    if (topSeat) topSeat.style.top = isCompactLandscape ? '3%' : '6%';
+    if (leftSeat) leftSeat.style.left = isPortrait ? '12%' : '13%';
 }
 
 let useAlmForProgress = true;
@@ -862,7 +928,6 @@ function shuffleSeats(arr) {
 }
 
 function initMatch() {
-    preloadIdolImages();
     gameRuleMaxRounds = parseInt(document.getElementById('game-rule').value);
     currentBakaze = 0; currentKyoku = 1; currentDealer = 0; playerScores = [25000, 25000, 25000, 25000];
     riichiSticks = 0;
@@ -1521,21 +1586,27 @@ function createTileElement(tileText, isHand = false, onClick = null) {
     else if(tileText === 'Anｵｰﾙﾏｲﾃｨ') displayText = 'An';
     else if(tileText === 'P（ｼﾞｮｰｶｰ）') displayText = 'P';
     
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    img.alt = displayText;
-    img.src = `idol_images/${tileText}.png`;
-    
-    img.onerror = function() {
-        this.style.display = 'none';
-        const span = document.createElement('span');
-        span.className = 'tile-text';
-        span.innerText = displayText;
-        div.appendChild(span);
-    };
-    
-    div.appendChild(img);
+    const fallback = document.createElement('span');
+    fallback.className = 'tile-text';
+    fallback.innerText = displayText;
+    div.appendChild(fallback);
+
+    const hasTileImage = IDOLS.Princess.includes(tileText) || IDOLS.Fairy.includes(tileText) || IDOLS.Angel.includes(tileText);
+    if (hasTileImage) {
+        const img = document.createElement('img');
+        img.loading = 'eager';
+        img.decoding = 'async';
+        img.alt = '';
+        img.style.visibility = 'hidden';
+        img.onload = () => {
+            img.style.visibility = 'visible';
+            fallback.style.display = 'none';
+        };
+        img.onerror = () => { img.style.display = 'none'; };
+        img.src = `idol_images/${encodeURIComponent(tileText)}.png`;
+        div.appendChild(img);
+    }
+
     if(onClick) { div.onclick = onClick; div.style.cursor = 'pointer'; }
     return div;
 }
@@ -1882,7 +1953,6 @@ function handleHostMsg(data) {
     }
 
     if(data.type === 'START_KYOKU') {
-        preloadIdolImages();
         hideWaitOverlay();
         const dov = document.getElementById('disconnect-overlay');
         if (dov) dov.style.display = 'none';
@@ -2233,17 +2303,12 @@ function hideActions() {
     highlightUnit(null);
 }
 
-window.addEventListener('resize', () => {
-    document.documentElement.style.setProperty('--app-h', (window.visualViewport ? window.visualViewport.height : window.innerHeight) + 'px');
-});
-if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-        document.documentElement.style.setProperty('--app-h', window.visualViewport.height + 'px');
-    });
+function syncAppViewport() {
+    const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-h', `${height}px`);
+    requestAnimationFrame(layoutTable);
 }
-
-window.addEventListener('resize', () => requestAnimationFrame(layoutTable));
-window.addEventListener('orientationchange', () => setTimeout(layoutTable, 200));
-if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => requestAnimationFrame(layoutTable));
-}
+syncAppViewport();
+window.addEventListener('resize', syncAppViewport);
+window.addEventListener('orientationchange', () => setTimeout(syncAppViewport, 200));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', syncAppViewport);
