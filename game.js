@@ -36,6 +36,8 @@ function layoutTable() {
 
     const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
     const root = document.documentElement;
+    const playerDock = document.getElementById('player-dock');
+    if (playerDock) root.style.setProperty('--player-dock-height', `${playerDock.offsetHeight}px`);
     const isPortrait = height > width;
     const isCompactLandscape = !isPortrait && height < 480;
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
@@ -1640,6 +1642,7 @@ function sortMyHand() { myLocalHand.sort((a, b) => (SORT_ORDER[a] ?? 999) - (SOR
 function createTileElement(tileText, isHand = false, onClick = null) {
     const div = document.createElement('div'); div.className = 'mahjong-tile';
     if(!tileText) return div;
+    div.dataset.tile = tileText;
     if(tileText.includes('ｵｰﾙﾏｲﾃｨ') || tileText === 'P（ｼﾞｮｰｶｰ）') div.classList.add('almighty');
     if(tileText === '青葉美咲' || tileText === '音無小鳥') div.classList.add('clerk');
     
@@ -1679,22 +1682,27 @@ function getRelPos(targetId) { return (targetId - myId + 4) % 4; }
 function renderOtherHands() {
     for (let i = 1; i <= 3; i++) {
         const absId = (myId + i) % 4; 
-        const div = document.getElementById(`hand-${i}`); div.innerHTML = '';
+        const div = document.getElementById(`hand-${i}`);
         const meldDiv = document.getElementById(`melds-${i}`);
-        if (meldDiv) meldDiv.innerHTML = '';
-        
         const closedCount = globalHandLens[absId] || 0; 
         const openArr = globalOpenTiles[absId] || [];
 
-        for (let j = 0; j < closedCount; j++) { 
-            const tile = document.createElement('div'); tile.className = 'mahjong-tile facedown'; div.appendChild(tile); 
+        while (div.children.length > closedCount) div.lastElementChild.remove();
+        while (div.children.length < closedCount) {
+            const tile = document.createElement('div');
+            tile.className = 'mahjong-tile facedown';
+            div.appendChild(tile);
         }
-        if (meldDiv && openArr.length > 0) {
+
+        const meldSignature = openArr.join('\u001f');
+        if (meldDiv && meldDiv.dataset.tileSignature !== meldSignature) {
+            meldDiv.replaceChildren();
             for (let j = 0; j < openArr.length; j++) {
                 const tile = createTileElement(openArr[j]);
                 tile.classList.add('open-tile');
                 meldDiv.appendChild(tile);
             }
+            meldDiv.dataset.tileSignature = meldSignature;
         }
     }
 }
@@ -1975,7 +1983,10 @@ function startDecisionTimer(label, onExpire, isNakiDecision = false) {
     const noTurnLimit = roomTimerSettings.basicSeconds === 0 && roomTimerSettings.poolSeconds === 0;
     if (noTurnLimit && !isNakiDecision) {
         activeDecisionTimer = null;
-        if (budget) budget.innerText = '';
+        if (budget) {
+            budget.innerText = '';
+            budget.style.display = 'none';
+        }
         return;
     }
     const fixedNakiLimit = noTurnLimit && isNakiDecision;
@@ -1988,13 +1999,16 @@ function startDecisionTimer(label, onExpire, isNakiDecision = false) {
     const update = () => {
         if (!activeDecisionTimer) return;
         const elapsed = (Date.now() - activeDecisionTimer.startedAt) / 1000;
-        if (activeDecisionTimer.fixedNakiLimit && budget) {
-            budget.innerText = `鳴き判断 残り ${Math.ceil(activeDecisionTimer.basicSeconds - elapsed)}秒`;
-        } else if (elapsed < activeDecisionTimer.basicSeconds && budget) {
-            budget.innerText = `基本残り ${Math.ceil(activeDecisionTimer.basicSeconds - elapsed)}秒 ・ 長考プール ${activeDecisionTimer.poolSeconds}秒`;
-        } else if (budget) {
-            const poolLeft = Math.max(0, activeDecisionTimer.poolSeconds - Math.ceil(elapsed - activeDecisionTimer.basicSeconds));
-            budget.innerText = `長考中 ・ プール残り ${poolLeft}秒`;
+        if (budget) {
+            budget.style.display = 'block';
+            if (activeDecisionTimer.fixedNakiLimit) {
+                budget.innerText = `0秒＋${Math.max(0, Math.ceil(activeDecisionTimer.basicSeconds - elapsed))}秒`;
+            } else {
+                const basicLeft = Math.max(0, Math.ceil(activeDecisionTimer.basicSeconds - elapsed));
+                const extraElapsed = Math.max(0, Math.ceil(elapsed - activeDecisionTimer.basicSeconds));
+                const poolLeft = Math.max(0, activeDecisionTimer.poolSeconds - extraElapsed);
+                budget.innerText = `${basicLeft}秒＋${poolLeft}秒`;
+            }
         }
         if (elapsed >= activeDecisionTimer.basicSeconds + activeDecisionTimer.poolSeconds) {
             const extra = finishDecisionTimer();
@@ -2349,7 +2363,25 @@ function handleHostMsg(data) {
 }
 
 function renderHand(isMyTurn) {
-    const div = document.getElementById('my-hand-area'); div.innerHTML = '';
+    const div = document.getElementById('my-hand-area');
+    const closedTilesByName = new Map();
+    const openTilesByName = new Map();
+    let spacer = null;
+    Array.from(div.children).forEach(element => {
+        if (element.dataset.handKind === 'spacer') spacer = element;
+        else if (element.classList.contains('mahjong-tile')) {
+            const tilesByName = element.dataset.handKind === 'open' ? openTilesByName : closedTilesByName;
+            const tile = element.dataset.tile;
+            if (!tilesByName.has(tile)) tilesByName.set(tile, []);
+            tilesByName.get(tile).push(element);
+        }
+    });
+    const takeReusableTile = (tilesByName, tile) => {
+        const matching = tilesByName.get(tile);
+        return matching && matching.length ? matching.shift() : createTileElement(tile, true);
+    };
+    const fragment = document.createDocumentFragment();
+
     myLocalHand.forEach((tile, idx) => {
         let isLocked = currentLockedIndices.has(idx);
         let isClickable = isMyTurn && !isLocked;
@@ -2362,10 +2394,22 @@ function renderHand(isMyTurn) {
             isClickable = false;
         }
 
-        let el = createTileElement(tile, true, null);
+        let el = takeReusableTile(closedTilesByName, tile);
+        el.dataset.handKind = 'closed';
+        el.dataset.handIndex = String(idx);
+        el.classList.remove('open-tile');
+        el.classList.toggle('locked-tile', isLocked);
+        el.classList.toggle('disabled', !isClickable);
+        el.classList.toggle('tile-selected', selectedHandIdx === idx);
+        el.style.cursor = isClickable ? 'pointer' : 'default';
+        el.onclick = null;
+        el.draggable = false;
+        el.ondragstart = null;
+        el.ondragend = null;
+        el.ondragover = null;
+        el.ondrop = null;
         if (isClickable) {
-            el.style.cursor = 'pointer';
-            el.addEventListener('click', (ev) => {
+            el.onclick = (ev) => {
                 ev.preventDefault();
                 if (isCoarsePointer()) {
                     if (selectedHandIdx === idx) discardFromHand(tile);
@@ -2373,13 +2417,9 @@ function renderHand(isMyTurn) {
                 } else {
                     discardFromHand(tile);
                 }
-            });
+            };
         }
-        if (selectedHandIdx === idx) el.classList.add('tile-selected');
-        
-        if (isLocked) {
-            el.classList.add('locked-tile'); el.style.cursor = 'default';
-        } else if (!isCoarsePointer()) {
+        if (!isLocked && !isCoarsePointer()) {
             el.draggable = true;
             el.ondragstart = (e) => { e.dataTransfer.setData('text/plain', String(idx)); el.style.opacity = '0.5'; };
             el.ondragend = () => { el.style.opacity = '1'; };
@@ -2387,27 +2427,31 @@ function renderHand(isMyTurn) {
             el.ondrop = (e) => { e.preventDefault(); let fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10); if(isNaN(fromIdx) || fromIdx === idx) return; let movingTile = myLocalHand.splice(fromIdx, 1)[0]; myLocalHand.splice(idx, 0, movingTile); selectedHandIdx = -1;
         _progressKey = ""; reorderLockedTilesToLeft(); renderHand(isMyTurnNow); };
         }
-        
-        if(!isClickable) el.classList.add('disabled'); 
-        div.appendChild(el);
+        fragment.appendChild(el);
     });
     
     let myOpen = globalOpenTiles[myId] || [];
     if (myOpen.length > 0) {
-        let spacer = document.createElement('div'); spacer.style.width = '20px'; div.appendChild(spacer);
+        if (!spacer) spacer = document.createElement('div');
+        spacer.dataset.handKind = 'spacer';
+        spacer.style.width = '20px';
+        fragment.appendChild(spacer);
         myOpen.forEach(tile => {
-            let el = createTileElement(tile, true);
+            let el = takeReusableTile(openTilesByName, tile);
+            el.dataset.handKind = 'open';
             el.classList.add('open-tile'); el.style.cursor = 'default';
-            div.appendChild(el);
+            fragment.appendChild(el);
         });
     }
-    
+
+    div.replaceChildren(fragment);
     scheduleProgressUI();
 }
 
 function hideActions() { 
     clearInterval(actionTimerInterval); 
     document.getElementById('action-budget').innerText = '';
+    document.getElementById('action-budget').style.display = 'none';
     document.getElementById('action-bar').style.display = 'none'; 
     document.getElementById('btn-tsumo').style.display = 'none'; 
     document.getElementById('btn-ron').style.display = 'none'; 
