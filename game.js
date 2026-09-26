@@ -2709,10 +2709,9 @@ function handleHostMsg(data) {
             document.getElementById('next-kyoku-msg').style.display = 'none';
             document.getElementById('result-overlay').style.display = 'flex';
         } else {
-            const pName = globalPlayerNames[data.pIdx];
             showCutin(data.isTsumo ? 'ツモ！' : 'ロン！', data.isTsumo ? '#4aa9e6' : '#ff0055');
             setTimeout(() => {
-                document.getElementById('result-winner').innerText = `${pName} のアガリ！`;
+                document.getElementById('result-winner').innerText = '点数移動';
                 
                 const resultHandDiv = document.getElementById('result-hand'); 
                 resultHandDiv.innerHTML = '';
@@ -2740,7 +2739,10 @@ function handleHostMsg(data) {
                 const sticks = data.riichiSticksAwarded || 0;
                 const note = sticks ? `供託 ${sticks} 本（${(sticks * 1000).toLocaleString('ja-JP')}点）は和了者が獲得` : '';
                 renderPointTransfer(data.scoresBefore, data.scores, note);
+                resultStage = 'transfer';
+                document.getElementById('result-point-transfer').style.display = 'block';
                 document.getElementById('btn-next-kyoku').style.display = 'inline-block';
+                document.getElementById('btn-next-kyoku').innerText = '次へ進む';
                 document.getElementById('next-kyoku-msg').style.display = 'none';
                 document.getElementById('result-overlay').style.display = 'flex';
             }, 1200);
@@ -2782,8 +2784,7 @@ function renderHand(isMyTurn) {
         const matching = tilesByName.get(tile);
         return matching && matching.length ? matching.shift() : createTileElement(tile, true);
     };
-    const fragment = document.createDocumentFragment();
-    const openFragment = document.createDocumentFragment();
+    const closedTiles = [];
 
     myLocalHand.forEach((tile, idx) => {
         let isLocked = currentLockedIndices.has(idx);
@@ -2830,19 +2831,27 @@ function renderHand(isMyTurn) {
             el.ondrop = (e) => { e.preventDefault(); let fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10); if(isNaN(fromIdx) || fromIdx === idx) return; let movingTile = myLocalHand.splice(fromIdx, 1)[0]; myLocalHand.splice(idx, 0, movingTile); selectedHandIdx = -1;
         _progressKey = ""; reorderLockedTilesToLeft(); renderHand(isMyTurnNow); };
         }
-        fragment.appendChild(el);
+        closedTiles.push(el);
     });
     
     let myOpen = globalOpenTiles[myId] || [];
+    const openTiles = [];
     myOpen.forEach(tile => {
         let el = takeReusableTile(openTilesByName, tile);
         el.dataset.handKind = 'open';
         el.classList.add('open-tile'); el.style.cursor = 'default';
-        openFragment.appendChild(el);
+        openTiles.push(el);
     });
 
-    div.replaceChildren(fragment);
-    openDiv.replaceChildren(openFragment);
+    const reconcileTiles = (container, desiredTiles) => {
+        desiredTiles.forEach((element, index) => {
+            const current = container.children[index] || null;
+            if (current !== element) container.insertBefore(element, current);
+        });
+        while (container.children.length > desiredTiles.length) container.lastElementChild.remove();
+    };
+    reconcileTiles(div, closedTiles);
+    reconcileTiles(openDiv, openTiles);
     layoutActionBudget();
     scheduleProgressUI();
 }
