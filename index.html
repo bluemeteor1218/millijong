@@ -104,7 +104,7 @@
             box-shadow: inset 0 0 90px rgba(0,0,0,0.28);
             border-radius: 0;
         }
-        #player-dock { flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 4px;
+        #player-dock { position: relative; flex: 0 0 auto; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; gap: 4px;
             min-height: 0; container-type: inline-size;
             padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
             background: linear-gradient(to top, rgba(0,0,0,0.45), rgba(0,0,0,0));
@@ -232,8 +232,8 @@
 
         /* アクションボタン（スマホ対応で下部中央へ） */
         .action-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(255, 235, 59, 0.95); padding: 8px 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96vw, 640px); flex-wrap: wrap; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
-        #action-budget { display: flex; flex: 0 0 auto; align-items: flex-end; justify-content: center; box-sizing: border-box;
-            align-self: flex-end; margin: 0; padding: 4px clamp(4px, 1cqw, 10px); border: clamp(1px, 0.3dvh, 2px) solid #fbc02d; border-radius: 6px;
+        #action-budget { position: absolute; z-index: 40; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box;
+            margin: 0; padding: 4px clamp(4px, 1cqw, 10px); border: clamp(1px, 0.3dvh, 2px) solid #fbc02d; border-radius: 6px;
             background: rgba(10,16,22,0.94); color: #ffeb3b; font-family: "Avenir Next", "Hiragino Sans", "Yu Gothic UI", sans-serif;
             font-size: 12px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums;
             white-space: nowrap; pointer-events: none; visibility: hidden; }
@@ -452,8 +452,8 @@
                 <div id="player-hand-row">
                     <button class="btn" id="btn-sort-hand" onclick="sortMyHand()">理牌</button>
                     <div id="my-hand-area"></div>
-                    <div id="action-budget" aria-live="off"></div>
                 </div>
+                <div id="action-budget" aria-live="off"></div>
             </div>
         </div>
     </div>

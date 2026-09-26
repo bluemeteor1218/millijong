@@ -12,7 +12,8 @@ function layoutActionBudget() {
     const sortButton = document.getElementById('btn-sort-hand');
     const hand = document.getElementById('my-hand-area');
     const budget = document.getElementById('action-budget');
-    if (!row || !sortButton || !hand || !budget) return;
+    const dock = document.getElementById('player-dock');
+    if (!row || !sortButton || !hand || !budget || !dock) return;
 
     const rowWidth = row.clientWidth;
     if (rowWidth < 1) return;
@@ -22,12 +23,14 @@ function layoutActionBudget() {
     const reservedBudgetWidth = Math.min(240, Math.max(84, rowWidth * 0.36));
     const maxHandWidth = Math.max(0, rowWidth - buttonWidth - reservedBudgetWidth - gap * 2);
     hand.style.maxWidth = `${maxHandWidth}px`;
-    const actualHandWidth = hand.getBoundingClientRect().width;
-    const availableBudgetWidth = Math.max(0, rowWidth - buttonWidth - actualHandWidth - gap * 2);
+    const rowRect = row.getBoundingClientRect();
+    const dockRect = dock.getBoundingClientRect();
+    const handRect = hand.getBoundingClientRect();
+    const availableBudgetWidth = Math.max(0, rowRect.right - handRect.right - gap);
     const budgetWidth = Math.min(240, availableBudgetWidth);
     budget.style.width = `${budgetWidth}px`;
-    budget.style.flexBasis = `${budgetWidth}px`;
-    budget.style.marginLeft = 'auto';
+    budget.style.right = `${Math.max(0, dockRect.right - rowRect.right)}px`;
+    budget.style.bottom = `${Math.max(0, dockRect.bottom - rowRect.bottom)}px`;
 
     if (!_actionBudgetMeasureContext) {
         _actionBudgetMeasureContext = document.createElement('canvas').getContext('2d');
