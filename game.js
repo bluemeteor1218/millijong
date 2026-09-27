@@ -538,6 +538,14 @@ function layoutTable() {
     const root = document.documentElement;
     const isPortrait = height > width;
     const isCompactLandscape = !isPortrait && height < 480;
+    const isCompactTable = height < 280;
+    const isUltraCompactTable = height < 180;
+    const centerStatus = document.getElementById('center-status');
+    board.classList.toggle('ultra-compact', isUltraCompactTable);
+    if (centerStatus) {
+        centerStatus.classList.toggle('compact-center', isCompactTable);
+        centerStatus.classList.toggle('ultra-compact', isUltraCompactTable);
+    }
     const handWidth = clamp(Math.min(width * 0.07, height * 0.07), 24, 48);
     const handHeight = clamp(handWidth * 1.4, 34, 64);
     const riverLength = isPortrait ? height : width;
@@ -593,7 +601,15 @@ function layoutTable() {
     if (rightSeat) rightSeat.style.left = isPortrait ? '88%' : '87%';
     if (topSeat) topSeat.style.top = isCompactLandscape ? '3%' : '6%';
     if (leftSeat) leftSeat.style.left = isPortrait ? '12%' : '13%';
+    const actionBar = document.getElementById('action-bar');
+    if (actionBar && centerStatus) {
+        const boardRect = board.getBoundingClientRect();
+        const centerRect = centerStatus.getBoundingClientRect();
+        const actionSpace = boardRect.bottom - centerRect.bottom - 10;
+        actionBar.style.maxHeight = `${clamp(actionSpace, 64, 320)}px`;
+    }
     layoutActionBudget();
+    layoutActionPrompt();
 }
 
 let useAlmForProgress = true;
@@ -1972,17 +1988,56 @@ function renderPointTransfer(scoresBefore, scoresAfter, note = '') {
     }
 }
 
+function layoutActionPrompt() {
+    const prompt = document.getElementById('action-prompt');
+    const tableArea = document.getElementById('table-area');
+    const actionBar = document.getElementById('action-bar');
+    const centerStatus = document.getElementById('center-status');
+    const river = document.getElementById('river-0');
+    if (!prompt || !tableArea || prompt.style.display === 'none') return;
+
+    const tableRect = tableArea.getBoundingClientRect();
+    const promptRect = prompt.getBoundingClientRect();
+    const actionBarVisible = actionBar && getComputedStyle(actionBar).display !== 'none';
+    const centerRect = centerStatus ? centerStatus.getBoundingClientRect() : null;
+    const riverRect = river ? river.getBoundingClientRect() : null;
+    const gap = 8;
+    const promptHeight = promptRect.height;
+    const maxTop = Math.max(4, tableRect.height - promptHeight - 4);
+    const preferredTop = actionBarVisible
+        ? actionBar.getBoundingClientRect().top - tableRect.top - promptHeight - gap
+        : riverRect
+            ? riverRect.top - tableRect.top - promptHeight - gap
+            : maxTop / 2;
+    const candidates = [
+        preferredTop,
+        centerRect ? centerRect.top - tableRect.top - promptHeight - gap : preferredTop,
+        centerRect ? centerRect.bottom - tableRect.top + gap : preferredTop,
+        4,
+        maxTop
+    ].map(top => Math.max(4, Math.min(maxTop, top)));
+    const promptLeft = (tableRect.width - promptRect.width) / 2;
+    const overlaps = (top, rect) => rect && promptLeft < rect.right - tableRect.left
+        && promptLeft + promptRect.width > rect.left - tableRect.left
+        && top < rect.bottom - tableRect.top
+        && top + promptHeight > rect.top - tableRect.top;
+    const safeCandidates = candidates.filter(top =>
+        !overlaps(top, centerRect)
+        && (!actionBarVisible || !overlaps(top, actionBar.getBoundingClientRect()))
+    );
+    const position = (safeCandidates.length ? safeCandidates : candidates)
+        .sort((a, b) => Math.abs(a - preferredTop) - Math.abs(b - preferredTop))[0];
+    prompt.style.top = `${position}px`;
+}
+
 function showActionPrompt(text) {
     const prompt = document.getElementById('action-prompt');
     const tableArea = document.getElementById('table-area');
-    const river = document.getElementById('river-0');
-    if (!prompt || !tableArea || !river) return;
+    if (!prompt || !tableArea) return;
     prompt.innerText = text;
     prompt.style.display = 'block';
-    const tableRect = tableArea.getBoundingClientRect();
-    const riverRect = river.getBoundingClientRect();
-    const promptHeight = prompt.getBoundingClientRect().height;
-    prompt.style.top = `${Math.max(4, riverRect.top - tableRect.top - promptHeight - 8)}px`;
+    layoutActionPrompt();
+    requestAnimationFrame(layoutActionPrompt);
 }
 
 function advanceResultStage() {
