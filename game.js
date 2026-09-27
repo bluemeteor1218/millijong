@@ -1107,6 +1107,7 @@ let skipFuriten = [false, false, false, false];
 let localSkipFuriten = false;
 let roomTimerSettings = { basicSeconds: 20, poolSeconds: 120 };
 let playerThinkingPools = [120, 120, 120, 120];
+let cpuDifficulty = 'normal';
 let activeDecisionTimer = null;
 function readRoomTimerSettings() {
     return {
@@ -1307,21 +1308,59 @@ function cpuDangerScore(tile, fromIdx) {
 }
 
 function getCpuDiscard(hand, pIdx = 0) {
+    if (cpuDifficulty === 'weak') {
+        return hand[Math.floor(Math.random() * hand.length)];
+    }
+
     const riverSeen = discards.flat();
+    const unitPotential = cpuDifficulty === 'normal' ? 0 : getCpuUnitPotential(hand);
+    const potentialWeight = cpuDifficulty === 'expert' ? 72 : 36;
+    const dangerWeight = cpuDifficulty === 'expert' ? 3 : 1;
+    const safeDiscardWeight = cpuDifficulty === 'expert' ? 24 : 6;
     let scores = [];
     for (let i = 0; i < hand.length; i++) {
         let score = 0; let t = hand[i];
         if (t.includes("ｵｰﾙﾏｲﾃｨ") || t === "P（ｼﾞｮｰｶｰ）") score += 1200;
         if (t === "青葉美咲" || t === "音無小鳥") score -= 5000;
         score += (hand.filter(x => x === t).length * 8);
-        score -= riverSeen.filter(x => x === t).length * 6;
-        score += cpuDangerScore(t, pIdx);
+        score -= riverSeen.filter(x => x === t).length * safeDiscardWeight;
+        score += cpuDangerScore(t, pIdx) * dangerWeight;
         if (hand.length <= 4 && (t.includes('ｵｰﾙﾏｲﾃｨ') || t === 'P（ｼﾞｮｰｶｰ）')) score += 400;
+        if (unitPotential) {
+            const afterDiscard = hand.slice();
+            afterDiscard.splice(i, 1);
+            score += (unitPotential - getCpuUnitPotential(afterDiscard)) * potentialWeight;
+        }
         scores.push({ tile: t, score: score });
     }
     let minScore = Math.min(...scores.map(s => s.score));
     let candidates = scores.filter(s => s.score === minScore);
     return candidates[Math.floor(Math.random() * candidates.length)].tile;
+}
+
+function getCpuUnitPotential(hand) {
+    let potential = 0;
+    for (const unit of unitsBySizeDesc()) {
+        if (unit.members.length < 3) continue;
+        let matches = 0;
+        for (const member of unit.members) {
+            if (hand.includes(member)) matches++;
+        }
+        if (matches >= 2) potential += (matches * matches) / Math.sqrt(unit.members.length);
+    }
+    return potential;
+}
+
+function getCpuWaitQuality(waitOption, pIdx) {
+    const visibleTiles = discards.flat().concat(openTiles.flat());
+    return waitOption.waits.reduce((quality, wait) => {
+        const remaining = getRemaining(wait.tile, visibleTiles);
+        const bestHan = Math.max(0, ...wait.units.map(name => {
+            const unit = UNIT_BY_NAME[name] || OFFICIAL_UNITS.find(candidate => candidate.name === name);
+            return unit ? unit.members.length - 2 : 0;
+        }));
+        return quality + (remaining * (1 + bestHan * 0.12));
+    }, 0) - (cpuDifficulty === 'expert' ? cpuDangerScore(waitOption.discard, pIdx) * 0.025 : 0);
 }
 
 function simulateNaki(pIdx, tile, unitName, allowHandAlmighty = true) {
@@ -1339,6 +1378,7 @@ function canNakiWithDiscardLeft(pIdx, tile, unitName, allowHandAlmighty = true) 
 }
 
 function getCpuNakiChoice(pIdx, tile) {
+    if (cpuDifficulty === 'weak') return null;
     if (playerRiichi[pIdx]) return null;
     const nakiUnits = checkCanNaki(playerHands[pIdx], tile);
     if (!nakiUnits) return null;
@@ -1358,14 +1398,19 @@ function getCpuNakiChoice(pIdx, tile) {
         const tenpaiAfter = getTenpaiInfo(sim.hand, sim.openAfter, true, pIdx).filter(t => t.waits && t.waits.length > 0);
         const becomesTenpai = tenpaiAfter.length > 0;
 
+        if (cpuDifficulty === 'strong' && !becomesTenpai) continue;
+        if (cpuDifficulty === 'expert' && !becomesTenpai && (size < 5 || afterDiscardClosed < 4)) continue;
+
         if (afterDiscardClosed <= 0 && !becomesTenpai) continue;
         if (closedNow <= 4 && !becomesTenpai) continue;
         if (afterDiscardClosed < 3 && !becomesTenpai && size < 5) continue;
 
         let value = 0;
         if (becomesTenpai) {
-            const waitN = tenpaiAfter.reduce((m, t) => m + t.waits.length, 0);
-            value += 250 + waitN * 8;
+            const waitValue = cpuDifficulty === 'normal'
+                ? tenpaiAfter.reduce((total, option) => total + option.waits.length, 0)
+                : tenpaiAfter.reduce((total, option) => total + getCpuWaitQuality(option, pIdx), 0);
+            value += 250 + waitValue * 8;
         }
         value += size * 6;
         value += afterDiscardClosed * 20;
@@ -1376,7 +1421,7 @@ function getCpuNakiChoice(pIdx, tile) {
     if (!scored.length) return null;
     scored.sort((a, b) => b.value - a.value);
     const best = scored[0];
-    if (!best.becomesTenpai && best.size <= 3 && Math.random() > 0.12) return null;
+    if (cpuDifficulty === 'normal' && !best.becomesTenpai && best.size <= 3 && Math.random() > 0.12) return null;
     if (!best.becomesTenpai && best.afterDiscardClosed < 4) return null;
     return best.name;
 }
@@ -1396,13 +1441,25 @@ function cpuTakeTurn(pIdx) {
         processDiscard(pIdx, drawn, false);
         return;
     }
-    if (openTiles[pIdx].length === 0) {
+    if (cpuDifficulty !== 'weak' && openTiles[pIdx].length === 0) {
         const tInfo = getTenpaiInfo(h, [], true, pIdx);
         const validWaits = tInfo.filter(t => t.waits.length > 0);
-        if (validWaits.length > 0 && playerScores[pIdx] >= 1000 && deck.length > 4 && Math.random() < 0.7) {
-            const discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
-            processDiscard(pIdx, discardTile, true);
-            return;
+        if (validWaits.length > 0) {
+            if (cpuDifficulty === 'normal') {
+                if (playerScores[pIdx] >= 1000 && deck.length > 4 && Math.random() < 0.7) {
+                    const discardTile = validWaits[Math.floor(Math.random() * validWaits.length)].discard;
+                    processDiscard(pIdx, discardTile, true);
+                    return;
+                }
+            } else {
+                const bestWait = validWaits
+                    .map(option => ({ option, quality: getCpuWaitQuality(option, pIdx) }))
+                    .sort((a, b) => b.quality - a.quality)[0].option;
+                const riichiChance = cpuDifficulty === 'expert' ? 0.95 : 0.82;
+                const canRiichi = playerScores[pIdx] >= 1000 && deck.length > 4 && Math.random() < riichiChance;
+                processDiscard(pIdx, bestWait.discard, canRiichi);
+                return;
+            }
         }
     }
     processDiscard(pIdx, getCpuDiscard(h, pIdx), false);
@@ -1505,6 +1562,10 @@ function shuffleSeats(arr) {
 function initMatch() {
     if (!requireFavoriteIdol()) return;
     gameRuleMaxRounds = parseInt(document.getElementById('game-rule').value);
+    const selectedCpuDifficulty = document.getElementById('cpu-difficulty-select').value;
+    cpuDifficulty = ['weak', 'normal', 'strong', 'expert'].includes(selectedCpuDifficulty)
+        ? selectedCpuDifficulty
+        : 'normal';
     currentBakaze = 0; currentKyoku = 1; currentDealer = 0; playerScores = [25000, 25000, 25000, 25000];
     riichiSticks = 0;
     const slots = [{ role: 'HOST', conn: null, name: document.getElementById('player-name-input').value || 'ホスト', favoriteIdol: selectedFavoriteIdol() }];
