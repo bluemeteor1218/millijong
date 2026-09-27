@@ -2253,10 +2253,8 @@ function revealTileImage(image, fallback, src) {
         };
         if (image.naturalWidth <= 0) {
             revealFallback();
-        } else if (typeof image.decode === 'function') {
-            image.decode().then(revealImage).catch(revealFallback);
         } else {
-            revealImage();
+            requestAnimationFrame(revealImage);
         }
     };
     image.onerror = () => {

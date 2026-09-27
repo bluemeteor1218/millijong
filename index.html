@@ -269,7 +269,7 @@
         /* アクションボタン（スマホ対応で下部中央へ） */
         .action-bar { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); box-sizing: border-box; background: rgba(255, 235, 59, 0.95); padding: 8px 10px; border-radius: 8px; display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 200; border: 2px solid #fbc02d; width: max-content; max-width: min(96%, 640px); max-height: min(65%, 320px); overflow-y: auto; flex-wrap: wrap; align-content: flex-start; justify-content: center; gap: 8px; flex-direction: row; align-items: center;}
         #naki-buttons-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; min-width: 0; max-width: 100%; }
-        #naki-buttons-container .btn { flex: 1 1 calc(50% - 3px); min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+        #naki-buttons-container .btn { flex: 0 1 clamp(9em, 15vw, 12em); min-width: 0; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
         #action-prompt { position: absolute; z-index: 180; display: none; left: 50%; transform: translateX(-50%); max-width: 92%; padding: 6px 12px; border: 2px solid #fbc02d; border-radius: 8px; background: rgba(255,235,59,0.96); color: #222; font-size: 16px; font-weight: bold; text-align: center; white-space: nowrap; box-shadow: 0 3px 8px rgba(0,0,0,0.4); }
         #table-area.ultra-compact #action-prompt { display: none !important; }
         #action-budget { position: absolute; z-index: 40; display: flex; align-items: flex-end; justify-content: center; box-sizing: border-box;
