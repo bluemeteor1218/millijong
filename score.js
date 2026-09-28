@@ -163,9 +163,14 @@ function calculateMahjongScore(units, hand, a, b, c, d, e, f, g, oshiTile, openU
         return { han: 0, fu: 0, details: ['役なし'], rank: '役なし', score: 0, payAll: 0, payDealer: 0, payChild: 0 };
     }
 
+    const pureThirteenMemberYakuman = !usedWild && parsed.some(unit => unit.len === 13);
     let rank = '';
     let basePoint = 0;
-    if (han >= 13) { rank = '役満'; basePoint = 8000; }
+    if (pureThirteenMemberYakuman) {
+        rank = 'ダブル役満';
+        basePoint = 16000;
+        details.push('純愛13人役 (ダブル役満)');
+    }
     else if (han >= 11) { rank = '三倍満'; basePoint = 6000; }
     else if (han >= 8) { rank = '倍満'; basePoint = 4000; }
     else if (han >= 6) { rank = '跳満'; basePoint = 3000; }
